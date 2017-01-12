@@ -1,0 +1,40 @@
+3.
+    What is concurrency? What is parallelism? What's the difference?
+
+Concurrency: the decomposability property of a program, which means that the order of which parts of the program are ran does not affect the result.
+Parallelism is when multiple processes can execute simultaneously.
+Concurrency allows you to do parallel computing, because different parts of the program can be executed in different order and even at the same time.
+
+    Why have machines become increasingly multicore in the past decade?
+
+Because increasing the clock frequency to increase speed is no longer very efficient when you reach 2.5-4 GHz, and the power consumption increase is too high.
+
+    What kinds of problems motivates the need for concurrent execution? (Or phrased differently: What problems do concurrency help in solving?)
+
+Concurrency solve problems related to shared resources, problems which arise when multiple processes or programs attempt to acces the same resource (data, a variable, etc.) simultaneously, which can lead to data inconsistency.
+
+    Does creating concurrent programs make the programmer's life easier? Harder? Maybe both? (Come back to this after you have worked on part 4 of this exercise)
+
+The complexity of the software increases, and you get more overhead, but the program will also become more deterministic.
+
+    What are the differences between processes, threads, green threads, and coroutines?
+
+A process is an instance of a program being executed. It can contain one or more thread, depending on whether the environment is single- or multithreaded. All threads run concurrently. 
+A green thread is a thread which is managed in user space, and emulate a multithreaded environment, allowing a degree of multithreading by software in environments that do not support multithreading natively. 
+Coroutines are cooperating components in a program that allow certain entry points for suspending and resuming execution at certain locations to allow other routines to run.
+
+    Which one of these do pthread_create() (C/POSIX), threading.Thread() (Python), go (Go) create?
+
+C and Python: thread, Go: green thread/coroutine
+
+    How does pythons Global Interpreter Lock (GIL) influence the way a python Thread behaves?
+
+It locks the interpreter, so that it can only be used by one thread at a time. 
+
+    With this in mind: What is the workaround for the GIL (Hint: it's another module)?
+
+Use multiple interpreters, the module is Multiprocessing.
+
+    What does func GOMAXPROCS(n int) int change?
+
+The number of OS threads used.
