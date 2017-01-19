@@ -1,0 +1,5 @@
+Theory
+Atomic operation: an operation which cannot be split up, and has to be completed as a whole. 
+Semaphore: a counter which keeps track of a resource. If a program wants to access the resource, it can issue a WAIT, decrementing the semaphore. If the value of the semaphore is 0 or lower, the program has to wait. When the counter reaches 1 or higher, the program gets to run. When the program is done using the resource, it issues a SIGNAL, incrementing the semaphore.
+Mutex: like a binary semaphore, except it has a sense of ownership. Only the process which locked the mutex can unlock it.
+Critical section: a part of a programs code which has to run without any other programs running their critical section.
