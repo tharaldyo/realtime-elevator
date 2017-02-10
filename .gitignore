@@ -1,0 +1,7 @@
+# Compiled files
+ebin
+*.beam
+*.o
+
+# Crash logs, etc.
+*.dump
