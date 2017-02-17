@@ -5,8 +5,8 @@
 -define(SEND_PORT, 20067).
 
 start() ->
-	spawn(fun -> listen/0),
-	spawn(fun -> broadcast/0).
+	spawn(fun listen/0),
+	spawn(fun broadcast/0).
 
 listen() ->
 	{ok, ReceiveSocket} = gen_udp:open(?RECEIVE_PORT, [list, {active, false}]),
@@ -16,9 +16,9 @@ listen(ReceiveSocket) ->
 	{ok, {_Address, _Port, NodeName}} = gen_udp:recv(ReceiveSocket, 0),
 	case list:member(NodeName, [node()|nodes()]) of
 		true ->
-			listen(ReceiveSocket)
+			listen(ReceiveSocket);
 		false ->
-			net_adm:ping(list_to_atom(NodeName)) % ping node to create a connection
+			net_adm:ping(list_to_atom(NodeName)), % ping node to create a connection
 			listen(ReceiveSocket)
 		end.
 
