@@ -27,7 +27,7 @@ foreach_button(FunctionForeachButton) ->
     TopFloorButtonTypes = lists:delete(up, ?BUTTON_TYPES),
     BottomFloorButtonTypes = lists:delete(down, ?BUTTON_TYPES),
     OtherFloorButtonTypes = ?BUTTON_TYPES,
-    
+
     ForeachDirection = fun(FunctionForeachDirection, Floor) -> %FunctionForeachDirection(Direction)
 			       if
 				   Floor == 0 ->
@@ -40,9 +40,9 @@ foreach_button(FunctionForeachButton) ->
 		       end,
 
     ForeachDirectionWrapper = fun(Floor) -> ForeachDirection(fun(Direction) -> FunctionForeachButton(Floor, Direction) end, Floor) end,
-    
+
     foreach_floor(ForeachDirectionWrapper).
-			  
+
 
 
 %% Call backs
@@ -69,6 +69,7 @@ stop() ->
 
 init_port(ExtPrg, Listener) ->
     register(driver, self()),
+	io:format("Driver pid: ~p~n", [self()]),
     process_flag(trap_exit, true),
     Port = open_port({spawn, ExtPrg}, [{packet, 2}]),
     loop(Port, Listener).
@@ -81,7 +82,7 @@ loop(Port, Listener) ->
 		{Port, {data, Data}} ->
 		    Caller ! {self(), Data}
 	    end,
-	    loop(Port, Listener); 
+	    loop(Port, Listener);
 	stop ->
 	    Port ! {self(), close},
 	    receive
@@ -121,7 +122,7 @@ order_button_poller(Listener, Floor, Direction, LastState) ->
 
 call_port(Msg) ->
     driver ! {call, self(), Msg},
-    receive 
+    receive
 	{_PID, [Result]} ->
 	    Result
     end.
@@ -152,13 +153,13 @@ encode({elev_set_button_lamp, command, Floor, off}) -> [10, 2, Floor, 0].
 
 
 %% Helper functions
-%%%%%%%%%%%%%%%%%%%%%%    
+%%%%%%%%%%%%%%%%%%%%%%
 
 
 %Function(Floor)
-foreach_floor(Function) -> 
+foreach_floor(Function) ->
     FloorIterator = fun(FloorIterator, Floor) ->
-			    if 
+			    if
 				Floor == 0 ->
 				    Function(Floor);
 				(Floor > 0) and (Floor =< ?NUMBER_OF_FLOORS-1) ->
@@ -166,6 +167,6 @@ foreach_floor(Function) ->
 				    FloorIterator(FloorIterator, Floor-1)
 			    end
 		    end,
-    
+
     FloorIterator(FloorIterator, ?NUMBER_OF_FLOORS-1),
     ok.
