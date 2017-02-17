@@ -16,15 +16,16 @@ loop(Number, Backup, Rand) when 3 /= Rand ->
 	RandNew = rand:uniform(5),
 	loop(Number+1, Backup, RandNew);
 loop(Number, Backup, Rand) when 3 == Rand ->
+	io:format("I'm crashing :-( ~n"),
 	exit(normal).
 
 backup(Number) ->
-	io:format("temp ~n"),
+	io:format("New backup created. ~n"),
 	b_loop(Number).
 	
 b_loop(Number) ->
 	receive N ->
 		b_loop(N)
-	after 5000 ->
-		count(Number)
+	after 2000 ->
+		count(Number+1)
 	end.
