@@ -10,10 +10,10 @@ start() ->
 	spawn(fun broadcast/0).
 
 node_init() ->
-	{_ok, [{IPtuple, _No, _Not} | _Disregard]} = inet:getif(), %fix this
+	{_ok, [{IPtuple, _Broadcast, _Self} | _Disregard]} = inet:getif(), %fix this (make it more general)
 	NodeName = "heis@"++integer_to_list(element(1,IPtuple))++"."++integer_to_list(element(2,IPtuple))++"."++integer_to_list(element(3,IPtuple))++"."++integer_to_list(element(4,IPtuple)), %how do I program
 	%NodeName = "heis@"++[tuple_to_list(IPtuple)], % this should work, because a name only has to be unique (doesn't have to be the actual IP at @host)
-	net_kernel:start([list_to_atom(NodeName), longnames]),
+	net_kernel:start([list_to_atom(NodeName), longnames]), % give node a longname
 	erlang:set_cookie(node(), 'what-is-network-security?').
 
 listen() ->
@@ -22,15 +22,15 @@ listen() ->
 
 listen(ReceiveSocket) ->
 	{ok, {_Address, _Port, NodeName}} = gen_udp:recv(ReceiveSocket, 0),
-	io:format("NodeName: ~p~n", [NodeName]), %debug
+	%io:format("NodeName: ~p~n", [NodeName]), %debug
 	Node = list_to_atom(NodeName),
-	io:format("is member bool: ~p~n", [lists:member(Node, [node()|nodes()])]), %debug
+	%io:format("is member bool: ~p~n", [lists:member(Node, [node()|nodes()])]), %debug
 	case lists:member(Node, [node()|nodes()]) of
 		true ->
 			listen(ReceiveSocket);
 		false ->
-			%io:format("Hello from not a member of list ~n"), %debug
 			net_adm:ping(Node), % ping node to create a connection
+			io:format("Node connected: ~p~n", [Node]), %debug
 			listen(ReceiveSocket)
 		end.
 

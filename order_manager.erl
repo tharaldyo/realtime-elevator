@@ -1,17 +1,7 @@
--module(elevator).
+-module(order_manager).
 -export([start/0]).
 
 start() ->
-	connection_manager:start(),
-	%IdlePID = spawn(fun idle/0),
-	IdlePID = spawn(fun order_manager:start/0),
-	elev_driver:start(IdlePID, elevator),
-	io:format("Elevator pid: ~p~n", [self()]),
-	%io:format("hello from below spawn~n"). %debug
-	IdlePID ! {floor_reached, 2}. %debug
-
-
-idle() ->
 	receive
 		{floor_reached, 0} ->
 			elev_driver:set_motor_direction(up),
@@ -25,4 +15,4 @@ idle() ->
 		end,
 
 
-	idle().
+	start().
