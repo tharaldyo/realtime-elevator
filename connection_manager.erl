@@ -14,7 +14,8 @@ listen() ->
 
 listen(ReceiveSocket) ->
 	{ok, {_Address, _Port, NodeName}} = gen_udp:recv(ReceiveSocket, 0),
-	case list:member(NodeName, [node()|nodes()]) of
+	io:format("NodeName: ~p~n", [NodeName]),
+	case lists:member(list_to_atom(NodeName), [node()|nodes()]) of
 		true ->
 			listen(ReceiveSocket);
 		false ->
