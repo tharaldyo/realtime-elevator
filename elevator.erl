@@ -4,7 +4,8 @@
 start() ->
 	connection_manager:start(),
 	%IdlePID = spawn(fun idle/0),
-	IdlePID = spawn(fun order_manager:start/0),
+	IdlePID = spawn(fun order_manager:temp_recv/0),
+	OrderManagerPID = spawn(fun order_manager:start/0),
 	elev_driver:start(IdlePID, elevator),
 	io:format("Elevator pid: ~p~n", [self()]),
 	%io:format("hello from below spawn~n"). %debug
