@@ -10,6 +10,8 @@ start() ->
 	spawn(fun broadcast/0).
 
 node_init() ->
+	os:cmd("epmd -daemon"), % start epmd as daemon in case it's not running
+	timer:sleep(100), % give epmd some time to start
 	{_ok, [{IPtuple, _Broadcast, _Self} | _Disregard]} = inet:getif(), %fix this (make it more general)
 	NodeName = "heis@"++integer_to_list(element(1,IPtuple))++"."++integer_to_list(element(2,IPtuple))++"."++integer_to_list(element(3,IPtuple))++"."++integer_to_list(element(4,IPtuple)), %how do I program
 	%NodeName = "heis@"++[tuple_to_list(IPtuple)], % this should work, because a name only has to be unique (doesn't have to be the actual IP at @host)
