@@ -1,10 +1,11 @@
 -module(order_manager).
--export([start/0, temp_recv/0]).
--record (order, {floor, direction}). % is this right?
+-compile(export_all).
+
+-record (order, {floor, direction}).
 
 start() ->
-	register(orderman, self()),
-	io:format("Orderman online and ready~n"),
+	register(order_manager, self()),
+	io:format("order_manager registered.~n"),
 	ok = mnesia:create_schema([node()]), % create schema on this node only, use [node()|nodes()] to install on all nodes
 	application:start(mnesia),
 	mnesia:create_table(order, [{attributes, record_info(fields, order)},
