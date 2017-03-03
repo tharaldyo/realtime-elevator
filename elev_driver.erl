@@ -47,7 +47,7 @@ foreach_button(FunctionForeachButton) ->
 
 %% Call backs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-new_order(Listener, Direction, Floor) -> Listener ! {new_order, Direction, Floor}.
+new_order(Listener, Direction, Floor) -> Listener ! {new_order, Floor, Direction}.
 floor_reached(Listener, Floor) -> Listener ! {floor_reached, Floor}.
 
 %% Process functions
