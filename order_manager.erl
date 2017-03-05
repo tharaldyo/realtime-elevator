@@ -3,7 +3,7 @@
 -record(order, {floor, direction}).
 
 start() ->
-	{ok, Ref} = dets:open_file(order_table, [{type, bag}]),
+	dets:open_file(order_table, [{type, set}]),
 	OrderTable = dets:lookup(order_table, order),
 	dets:close(order_table),
 	io:format("OrderTable: ~p~n", [OrderTable]),
@@ -13,7 +13,8 @@ start() ->
 add_order(Floor, Direction) -> % TODO: look at this
 	%orderman ! {add, {order, {Floor, Direction}}}.
 	timer:sleep(500),
-	add_order(#order{floor = Floor, direction = Direction}).
+	add_order({Floor, Direction}).
+	%add_order(#order{floor = Floor, direction = Direction}).
 	%orderman ! {add, Floor, Direction}.
 
 %add_order(Order) when Order#order.direction == command->
@@ -27,11 +28,14 @@ add_order(Order) ->
 % order_queue/1 eksporteres!!
 order_queue(Orders) ->
 	io:format("Orderlist: ~p~n", [Orders]),
+
 	receive
 		{add, NewOrder} ->
-			io:format("Adding ~p~n", [NewOrder]),
-			dets:open_file(order_table, [{type,bag}]),
-			dets:insert(order_table, NewOrder),
+			dets:open_file(order_table, [{type, set}]),
+			AddOrder = {NewOrder, 999},
+			io:format("Syntax: ~p~n", [AddOrder]),
+			dets:insert(order_table, AddOrder),
+
 			dets:close(order_table),
 			order_queue(Orders ++ [NewOrder]);
 
