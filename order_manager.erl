@@ -12,8 +12,10 @@ start() ->
 
 add_order(Floor, Direction) -> % TODO: look at this
 	%orderman ! {add, {order, {Floor, Direction}}}.
-	timer:sleep(500),
-	add_order(#order{floor = Floor, direction = Direction}).
+	timer:sleep(200),
+	add_order(#order{floor = Floor, direction = Direction}). % using record
+	%add_order(Floor, Direction}). % using regular tuple
+
 	%orderman ! {add, Floor, Direction}.
 
 %add_order(Order) when Order#order.direction == command->
@@ -21,7 +23,7 @@ add_order(Floor, Direction) -> % TODO: look at this
 
 add_order(Order) ->
 	io:format("order received, sending to orderman: ~p~n", [Order]),
-	orderman ! {add, Order}.
+	orderman ! {add_order, Order}.
 
 % Note: ?MODULE metoden Sivert bruker kan også brukes her, men da MÅ
 % order_queue/1 eksporteres!!
@@ -29,22 +31,22 @@ order_queue(Orders) ->
 	io:format("Orderlist: ~p~n", [Orders]),
 
 	receive
-		{add, NewOrder} ->
+		{add_order, NewOrder} ->
 			dets:open_file(order_table, [{type, bag}]),
-			AddOrder = {NewOrder, 999},
-			io:format("Syntax: ~p~n", [AddOrder]),
-			dets:insert(order_table, AddOrder),
+			io:format("Syntax: ~p~n", [NewOrder]),
+			dets:insert(order_table, NewOrder),
 
 			dets:close(order_table),
 			order_queue(Orders ++ [NewOrder]);
 
-		{remove, Order} ->
-			dets:open_file(order_table),
+		{remove_order, Order} ->
+			dets:open_file(order_table, [{type, bag}]),
 			dets:delete_object(order_table, Order),
 			dets:close(order_table),
 			order_queue(Orders--[Order]);
 
-		{get, PID} ->
+		{get_orders, PID} ->
+			io:format("get_orders received ~n"),
 			PID ! Orders,
 			order_queue(Orders)
 			%?MODULE:order_queue(dets:to_list(dets:from_list(Orders)))
