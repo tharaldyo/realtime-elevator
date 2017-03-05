@@ -1,0 +1,3 @@
+sudo apt-get install libcomedi-dev
+sudo dpkg -i dmd_*
+sudo apt-get install erlang-dev

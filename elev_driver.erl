@@ -1,20 +1,22 @@
 -module(elev_driver).
 -export([start/2, stop/0]).
 -export([init/1, set_motor_direction/1, set_door_open_lamp/1, set_stop_lamp/1, set_floor_indicator/1, set_button_lamp/3, foreach_button/1]).
+-include("records_and_macros.hrl").
 
--define(NUMBER_OF_FLOORS, 4).
--define(BUTTON_TYPES, [up, down, command]).
 
--define(POLL_PERIOD, 50).
+%This Driver and all the belonging files are shamelessly copied and modified 
+%from Kjetil Kjeka's github repo, found at https://github.com/kjetilkjeka/sanntidsheis
+%We deemed this as a better alternative to the approach used in the example driver folder.
+%And we didn't want to "copy" http://erlang.org/doc/tutorial/c_port.html ourselves.
 
 %% Module API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init(ElevatorType) -> call_port({elev_init, ElevatorType}).
-set_motor_direction(Direction) -> call_port({elev_set_motor_direction, Direction}).
-set_door_open_lamp(State) -> call_port({elev_set_door_open_lamp, State}).
 set_stop_lamp(State) -> call_port({elev_set_stop_lamp, State}).
+set_door_open_lamp(State) -> call_port({elev_set_door_open_lamp, State}).
 set_floor_indicator(Floor) -> call_port({elev_set_floor_indicator, Floor}).
+set_motor_direction(Direction) -> call_port({elev_set_motor_direction, Direction}).
 set_button_lamp(Floor, Direction, State) -> call_port({elev_set_button_lamp, Direction, Floor, State}).
 
 %FunctionForeachButton(Floor, Direction)
@@ -27,7 +29,7 @@ foreach_button(FunctionForeachButton) ->
     TopFloorButtonTypes = lists:delete(up, ?BUTTON_TYPES),
     BottomFloorButtonTypes = lists:delete(down, ?BUTTON_TYPES),
     OtherFloorButtonTypes = ?BUTTON_TYPES,
-
+    
     ForeachDirection = fun(FunctionForeachDirection, Floor) -> %FunctionForeachDirection(Direction)
 			       if
 				   Floor == 0 ->
@@ -40,14 +42,14 @@ foreach_button(FunctionForeachButton) ->
 		       end,
 
     ForeachDirectionWrapper = fun(Floor) -> ForeachDirection(fun(Direction) -> FunctionForeachButton(Floor, Direction) end, Floor) end,
-
+    
     foreach_floor(ForeachDirectionWrapper).
-
+			  
 
 
 %% Call backs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-new_order(Listener, Direction, Floor) -> Listener ! {new_order, Floor, Direction}.
+new_order(Listener, Direction, Floor) -> Listener ! {new_order, Direction, Floor}.
 floor_reached(Listener, Floor) -> Listener ! {floor_reached, Floor}.
 
 %% Process functions
@@ -69,7 +71,6 @@ stop() ->
 
 init_port(ExtPrg, Listener) ->
     register(driver, self()),
-	io:format("Driver pid: ~p~n", [self()]),
     process_flag(trap_exit, true),
     Port = open_port({spawn, ExtPrg}, [{packet, 2}]),
     loop(Port, Listener).
@@ -82,7 +83,7 @@ loop(Port, Listener) ->
 		{Port, {data, Data}} ->
 		    Caller ! {self(), Data}
 	    end,
-	    loop(Port, Listener);
+	    loop(Port, Listener); 
 	stop ->
 	    Port ! {self(), close},
 	    receive
@@ -122,7 +123,7 @@ order_button_poller(Listener, Floor, Direction, LastState) ->
 
 call_port(Msg) ->
     driver ! {call, self(), Msg},
-    receive
+    receive 
 	{_PID, [Result]} ->
 	    Result
     end.
@@ -153,13 +154,13 @@ encode({elev_set_button_lamp, command, Floor, off}) -> [10, 2, Floor, 0].
 
 
 %% Helper functions
-%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%    
 
 
 %Function(Floor)
-foreach_floor(Function) ->
+foreach_floor(Function) -> 
     FloorIterator = fun(FloorIterator, Floor) ->
-			    if
+			    if 
 				Floor == 0 ->
 				    Function(Floor);
 				(Floor > 0) and (Floor =< ?NUMBER_OF_FLOORS-1) ->
@@ -167,6 +168,6 @@ foreach_floor(Function) ->
 				    FloorIterator(FloorIterator, Floor-1)
 			    end
 		    end,
-
+    
     FloorIterator(FloorIterator, ?NUMBER_OF_FLOORS-1),
     ok.
