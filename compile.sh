@@ -10,6 +10,6 @@ cd ebin/;
 rm order_table;
 echo "---------------------------------------------------------"
 echo
-erl -eval "elevator:start()";
+erl;
 pkill elev_port;
 cd ..;
