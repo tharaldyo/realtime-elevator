@@ -76,7 +76,12 @@ elevator_manager_loop() ->
 			stateman ! {update_state, floor, NewFloor};
 			%stateman ! {get_state, self()},
 
-		{idle} -> %logic for distributing orders?
+		{idle} ->
+			stateman ! {update_state, state, idle},
+			% delay here to prevent multiple elevators attempting to invoke order distribution simultaneously
+			% possible problem: elevators calling distributor at the same time when multiple elevators are idle?
+
+			% this stuff below belongs in order_distributor
 			orderman ! {get_orders, self()},
 			receive
 				[] ->
@@ -86,6 +91,9 @@ elevator_manager_loop() ->
 					[MyOrder|_Disregard] = OrderList,
 					io:format("my order: ~p~n", [MyOrder]), %debug
 					stateman ! get_state,
+
+					% this stuff can stay here
+					% let order_distributor return a goal floor, then we decide where to go in here
 					CurrentFloor = receive {_Name, _State, Floor, _Direction} -> Floor end,
 					Difference = CurrentFloor - element(2, MyOrder),
 					if
@@ -110,6 +118,9 @@ state_manager(NodeName, State, Floor, Direction) ->
 		receive
 			{node_name, NewName} ->
 				state_manager(NewName, State, Floor, Direction);
+
+			{update_state, state, NewState} ->
+				state_manager(NodeName, NewState, Floor, Direction);
 
 			{update_state, floor, NewFloor} ->
 				state_manager(NodeName, State, NewFloor, Direction);
