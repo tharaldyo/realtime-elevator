@@ -54,12 +54,15 @@ elevator_manager() ->
 	receive {fsm, intializing} -> ok end,
 	receive {stateman, initialized} -> ok end,
 
+	% TODO: remember to test this with the elevator!
 	driverman ! {set_motor, down},
 	receive {floor_reached, NewFloor} ->
 		elevatorman ! {set_motor, stop},
 		stateman ! {update_state, floor, NewFloor},
 		fsm ! {floor_reached}
 	end,
+
+	receive {fsm, initialized} -> ok end,
 
 	timer:sleep(500), %debug
 	io:format("Elevator initialized, ready for action. ~n"), %debug
