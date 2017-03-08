@@ -5,9 +5,9 @@ start() ->
   spawn(fun state_initializing/0).
 
 state_initializing() ->
-  elevatorman ! init_started,
+  elevatorman ! {fsm, intializing},
   receive {floor_reached} ->
-    elevatorman ! init_completed
+    elevatorman ! {fsm, initialized}
   end,
 
   state_idle().
@@ -15,7 +15,7 @@ state_initializing() ->
 state_idle() ->
   elevatorman ! idle,
   receive
-    {move, Direction} ->
+    {move} -> %{move, Direction} ->
       state_driving();
     {floor_reached} ->
       state_doors_open()
@@ -43,7 +43,7 @@ state_doors_open() ->
   io:format("hello from doors_open ~n").
 
 state_lost() ->
-  elevatorman ! stuck,
+  elevatorman ! lost,
   receive
     {floor_reached} ->
       elevatorman ! {set_motor, stop},
