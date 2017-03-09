@@ -108,6 +108,7 @@ order_button_poller(Listener, Floor, Direction, LastState) ->
     ThisState = call_port({elev_get_button_signal, Direction, Floor}),
     case (ThisState /= LastState) and (ThisState == 1) of
 	true ->
+      io:format("New order at driver level ~n"), %debug
 	    new_order(Listener, Direction, Floor);
 	false ->
 	    timer:sleep(?POLL_PERIOD)

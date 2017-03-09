@@ -35,14 +35,14 @@ order_queue(Orders) ->
 			case sets:is_element(NewOrder, sets:from_list(Orders)) of
 				false ->
 					dets:open_file(order_table, [{type, bag}]),
-					io:format("Syntax: ~p~n", [NewOrder]),
+					%io:format("Syntax: ~p~n", [NewOrder]), %debug
 					dets:insert(order_table, NewOrder),
 					dets:close(order_table),
 					order_queue(Orders ++ [NewOrder]);
 				true ->
-					io:format("Order already exists.~n")
+					io:format("Order already exists.~n"), %debug
 					order_queue(Orders)
-				end.
+			end;
 
 		{remove_order, Order} ->
 			dets:open_file(order_table, [{type, bag}]),

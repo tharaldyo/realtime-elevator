@@ -114,7 +114,7 @@ elevator_manager_loop() ->
 					stateman ! {update_state, target_floor, OrderFloor},
 					% write OrderFloor to disk?
 					% then delete it from the orderlist in order_manager
-					stateman ! get_state,
+					stateman ! {get_state, self()},
 					CurrentFloor = receive {_Name, _State, Floor, _Direction, _Target} -> Floor end,
 					if
 						CurrentFloor - OrderFloor == 0 ->

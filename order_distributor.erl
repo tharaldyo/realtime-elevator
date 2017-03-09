@@ -30,7 +30,10 @@ distributor() ->
 
             _ ->
               Executor = find_best_elevator(Order),
-              io:format("The executor: ~p~n", [Executor]) %debug
+              io:format("The executor: ~p~n", [list_to_atom(element(1, Executor))]), %debug
+              io:format("will receive this floor: ~p~n", [Order#order.floor]),
+              {elevatorman, list_to_atom(element(1, Executor))} ! {order, Order#order.floor}
+
               % send order to executor
 
           end,
@@ -53,7 +56,7 @@ distributor() ->
 find_best_elevator(Order) ->
   Elevators = get_all_elevators(),
   io:format("Elevators: ~p~n", [Elevators]), %debug
-  CostList = list:map(fun(Elevator) -> {abs(element(3, Elevator) - Order#order.floor), Elevator} end, Elevators),
+  CostList = lists:map(fun(Elevator) -> {abs(element(3, Elevator) - Order#order.floor), Elevator} end, Elevators),
   [{_Cost, Executor} | _Disregard] = lists:keysort(1, CostList),
   % Executor = element(2, ExecutorTuple),
   % Order#order.floor
@@ -77,7 +80,7 @@ get_all_elevators() ->
   end, [node()|nodes()]), %debug use [node()|nodes()]
 
     ListCreator ! return_list,
-    io:format("hello from I just asked for list ~n"),
+    %io:format("hello from I just asked for list ~n"), %debug
     Elevators = receive ElevatorList -> ElevatorList end,
     Elevators.
 
