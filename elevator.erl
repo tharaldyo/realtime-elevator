@@ -100,18 +100,18 @@ elevator_manager_loop() ->
 					localorderman ! {get_orders, self()},
 
 					receive
-						{orders, Orders} ->
-							io:format("Orders: ~p~n", [Orders]),
-							LocalOrdersInSameDir = lists:filter(fun({_A,Floor,Dir}) -> (Floor==NewFloor) end, Orders),
+						{orders, LocalOrders} ->
+							io:format("Orders: ~p~n", [LocalOrders]),
+							LocalOrdersInSameDir = lists:filter(fun({_A,Floor,Dir}) -> (Dir==command) and (Floor==NewFloor) end, LocalOrders),
 							io:format("Adding: ~p~n", [LocalOrdersInSameDir])
 					end,
 
 					orderman ! {get_orders, self()},
 
 					receive
-						{orders, Orders} ->
-							io:format("Orders: ~p~n", [Orders]),
-							GlobalOrdersInSameDir = lists:filter(fun({_A,Floor,Dir}) -> (Dir==ElevDir) and (Floor==NewFloor) end, Orders),
+						{orders, GlobalOrders} ->
+							io:format("Orders: ~p~n", [GlobalOrders]),
+							GlobalOrdersInSameDir = lists:filter(fun({_A,Floor,Dir}) -> (Dir==ElevDir) and (Floor==NewFloor) end, GlobalOrders),
 							io:format("Adding: ~p~n", [GlobalOrdersInSameDir])
 					end,
 

@@ -20,10 +20,10 @@ distributor() ->
         {orders, LocalOrderList} ->
           [LocalOrder|_D] = LocalOrderList,
           io:format("local order received: ~p~n", [LocalOrder]), %debug
-          elevatorman ! {order, LocalOrder#order.floor}
+          elevatorman ! {order, LocalOrder#order.floor},
+          order_manager:remove_order(localorderman, LocalOrder)
 
         end,
-
 
       orderman ! {get_orders, self()},
       receive
@@ -37,10 +37,8 @@ distributor() ->
           Executor = find_best_elevator(GlobalOrder),
           %io:format("The executor: ~p~n", [list_to_atom(element(1, Executor))]), %debug
           %io:format("will receive this floor: ~p~n", [Order#order.floor]),
-          {elevatorman, list_to_atom(element(1, Executor))} ! {order, GlobalOrder#order.floor}
-
-          % send order to executor
-          %orderman ! {remove_order, Order} %debug ONLY, remember to remove this
+          {elevatorman, list_to_atom(element(1, Executor))} ! {order, GlobalOrder#order.floor},
+          order_manager:remove_order(orderman, GlobalOrder)
 
         end
 

@@ -16,7 +16,9 @@ add_order(Floor, Direction) ->
 			end.
 
 remove_order(QueueName, Order) ->
+	io:format("removing order: ~p~n", [Order]),
 	QueueName ! {remove_order, Order},
+	io:format("Goes wrong: ~p ~p~n", [QueueName, Order]),
 	case QueueName of orderman ->
 		lists:foreach(fun(Node) -> {orderman, Node} ! {remove_order, Order} end, nodes())
 	end.
@@ -46,6 +48,7 @@ order_queue(Orders) ->
 			end;
 
 		{remove_order, Order} ->
+			io:format("removing order: ~p~n", [Order]),
 			dets:open_file(order_table, [{type, bag}]),
 			dets:delete_object(order_table, Order),
 			dets:close(order_table),
