@@ -28,7 +28,7 @@ state_idle() ->
   end.
 
 state_driving() ->
-  io:format("hello from driving ~n"),
+  %io:format("hello from driving ~n"),
   receive
     floor_reached ->
       driverman ! {set_motor, stop},

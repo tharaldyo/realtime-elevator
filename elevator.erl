@@ -32,7 +32,7 @@ driver_manager() ->
 driver_manager_loop() ->
 	receive
 		{new_order, Floor, Direction} -> % TODO: do pattern matching for "command" somewhere
-			io:format("new_order received in driver manager ~n"),
+			io:format("new_order: ~p~n", [Floor]),
 		  order_manager:add_order(Floor, Direction);
 
 		{floor_reached, 0} -> % arbitrary?
@@ -52,13 +52,11 @@ driver_manager_loop() ->
 			elev_driver:set_door_open_lamp(off);
 
 		_Message ->
-			io:format("driverman received an abnormal message: ~p~n", [_Message])
+			io:format("driverman received an abnormal message: ~p~n", [_Message]) %debug
 		end,
 	driver_manager_loop().
 
 elevator_manager() ->
-	io:format("elevatorman init ~n"), %debug
-
 	% make sure fsm and state manager initialize correctly
 	receive {driverman, initialized} -> ok end,
 	receive {fsm, intializing} -> ok end,
@@ -76,28 +74,64 @@ elevator_manager() ->
 	receive {fsm, initialized} -> ok end,
 
 	io:format("Elevator initialized, ready for action. ~n"), %debug
-
 	elevator_manager_loop().
 
 elevator_manager_loop() ->
 	receive
 		{floor_reached, NewFloor} ->
-			% set floor indicator light here
+			io:format("FLOOR ~p ---------------------- ~n", [NewFloor]),
 			stateman ! {update_state, floor, NewFloor},
 			stateman ! {get_state, self()},
 			OrderFloor = receive {_Name, _State, _Floor, _Direction, Target} -> Target end,
+			stateman ! {get_state, self()},
+			ElevDir = receive {_Name, _State, _Floor, Direction, _Target} -> Direction end,
 			case NewFloor of
 				OrderFloor ->
-					fsm ! floor_reached;
+					fsm ! floor_reached,
+					io:format("Target floor reached.~n");
 					%clear_all_floors_at(NewFloor)
 				_ ->
-					fsm ! floor_passed
-					%check_if_orders_here
+					fsm ! floor_passed,
+					% TODO: We also need to take care of "local" orders!
+					% Are there orders here going in the same direction?
+					% In this case we wish to stop, and take new orders.
+					% We then need to open door, give them some seconds to enter new order,
+					% and then close doors, and continue upwards.
+					localorderman ! {get_orders, self()},
+
+					receive
+						{orders, Orders} ->
+							io:format("Orders: ~p~n", [Orders]),
+							LocalOrdersInSameDir = lists:filter(fun({_A,Floor,Dir}) -> (Floor==NewFloor) end, Orders),
+							io:format("Adding: ~p~n", [LocalOrdersInSameDir])
+					end,
+
+					orderman ! {get_orders, self()},
+
+					receive
+						{orders, Orders} ->
+							io:format("Orders: ~p~n", [Orders]),
+							GlobalOrdersInSameDir = lists:filter(fun({_A,Floor,Dir}) -> (Dir==ElevDir) and (Floor==NewFloor) end, Orders),
+							io:format("Adding: ~p~n", [GlobalOrdersInSameDir])
+					end,
+
+					% Now have a list of orders in same dir. If there are any orders in this list
+					% we want to stop, open door, continue on! Consider putting code below
+					% into a "open_for_new_passengers"-function
+					case [LocalOrdersInSameDir]++[GlobalOrdersInSameDir] of
+						[] ->
+							io:format("No orders at this floor :-) ~n");
+						StuffAtThisFloor ->
+							driverman ! {set_motor, stop},
+							driverman ! {open_door},
+							timer:sleep(3000),
+							driverman ! {close_door},
+							lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersInSameDir),
+							lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersInSameDir),
+							driverman ! {set_motor, ElevDir}
+						end
 
 			end;
-			% if NewFloor == OrderFloor -> fsm ! floor_reached
-			% else, fsm ! floor_passed
-			%stateman ! {get_state, self()},
 
 		idle ->
 			stateman ! {update_state, state, idle},
@@ -107,14 +141,15 @@ elevator_manager_loop() ->
 
 			% this stuff below belongs in order_distributor
 			distributor ! get_floor,
-			io:format("sent get_floor to distributor, awaiting response ~n"), %debug
+			%io:format("sent get_floor to distributor, awaiting response ~n"), %debug
 
 			receive
 				{order, []} ->
-					io:format("received empty list, no orders available OR no order for me ~n"); %debug
+					io:format("~n");
+					%io:format("received empty list, no orders available OR no order for me ~n"); %debug
 
 				{order, OrderFloor} ->
-					io:format("received an order floor: ~p~n", [OrderFloor]),
+					%io:format("received an order floor: ~p~n", [OrderFloor]),
 					stateman ! {update_state, state, busy},
 					stateman ! {update_state, target_floor, OrderFloor},
 					% write OrderFloor to disk?
@@ -138,9 +173,6 @@ elevator_manager_loop() ->
 	elevator_manager_loop().
 
 state_manager(NodeName, State, Floor, Direction, TargetFloor) ->
-	io:format("statemanager has been called ~n"), %debug
-	%nameman ! {get_name, self()},
-
 		receive
 			{node_name, NewName} ->
 				state_manager(NewName, State, Floor, Direction, TargetFloor);

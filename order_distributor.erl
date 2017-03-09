@@ -12,33 +12,35 @@ distributor() ->
     get_floor -> % main "gimme new order" call
 
       % check if any orders are available, else send [] to the elevator making the request
+      localorderman ! {get_orders, self()},
+      receive
+        {orders, []} ->
+          io:format("no local orders available, checking global orders ~n");
+
+        {orders, LocalOrderList} ->
+          [LocalOrder|_D] = LocalOrderList,
+          io:format("local order received: ~p~n", [LocalOrder]), %debug
+          elevatorman ! {order, LocalOrder#order.floor}
+
+        end,
+
+
       orderman ! {get_orders, self()},
       receive
         {orders, []} ->
-          io:format("no orders available, sending empty list ~n"),
+          %io:format("no orders available, sending empty list ~n"),
           elevatorman ! {order, []};
 
-        {orders, OrderList} -> % get first order in queue (FIFO)
-          [Order|_Disregard] = OrderList,
-          io:format("order received: ~p~n", [Order]), %debug
-          % check if the order has direction "command" (comes from inside the elevator)
-          case Order#order.direction of
-            command ->
-              % if yes, send order to "local" elevator
-              io:format("received a command order, local elevator gets it ~n"), %debug
-              elevatorman ! {order, Order#order.floor};
+        {orders, GlobalOrderList} -> % get first order in queue (FIFO)
+          [GlobalOrder|_Disregard] = GlobalOrderList,
+          io:format("order received: ~p~n", [GlobalOrder]), %debug
+          Executor = find_best_elevator(GlobalOrder),
+          %io:format("The executor: ~p~n", [list_to_atom(element(1, Executor))]), %debug
+          %io:format("will receive this floor: ~p~n", [Order#order.floor]),
+          {elevatorman, list_to_atom(element(1, Executor))} ! {order, GlobalOrder#order.floor}
 
-            _ ->
-              Executor = find_best_elevator(Order),
-              io:format("The executor: ~p~n", [list_to_atom(element(1, Executor))]), %debug
-              io:format("will receive this floor: ~p~n", [Order#order.floor]),
-              {elevatorman, list_to_atom(element(1, Executor))} ! {order, Order#order.floor}
-
-              % send order to executor
-
-          end,
-
-          orderman ! {remove_order, Order} %debug ONLY, remember to remove this
+          % send order to executor
+          %orderman ! {remove_order, Order} %debug ONLY, remember to remove this
 
         end
 

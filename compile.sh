@@ -7,7 +7,7 @@ mkdir ebin/ 2> /dev/null;
 mv *.beam ebin/;
 make -C driver / > /dev/null;
 cd ebin/;
-rm order_table;
+rm order_table local_order_table global_order_table
 echo "---------------------------------------------------------"
 echo
 erl;
