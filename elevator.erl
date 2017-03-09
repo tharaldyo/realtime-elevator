@@ -87,8 +87,13 @@ elevator_manager_loop() ->
 			stateman ! {get_state, self()},
 			OrderFloor = receive {_Name, _State, _Floor, _Direction, Target} -> Target end,
 			case NewFloor of
-				OrderFloor -> fsm ! floor_reached;
-				_ -> fsm ! floor_passed
+				OrderFloor ->
+					fsm ! floor_reached;
+					%clear_all_floors_at(NewFloor)
+				_ ->
+					fsm ! floor_passed
+					%check_if_orders_here
+
 			end;
 			% if NewFloor == OrderFloor -> fsm ! floor_reached
 			% else, fsm ! floor_passed

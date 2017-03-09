@@ -1,6 +1,6 @@
 echo
 echo "---------------------------------------------------------"
-echo " ERLANG COMPILER OUTPUT"
+echo -e "\e[1m ERLANG COMPILER OUTPUT \e[21m"
 echo "---------------------------------------------------------"
 erlc *.erl;
 mkdir ebin/ 2> /dev/null;
