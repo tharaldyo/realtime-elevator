@@ -33,8 +33,10 @@ distributor() ->
               io:format("The executor: ~p~n", [Executor]) %debug
               % send order to executor
 
+          end,
 
-          end
+          orderman ! {remove_order, Order} %debug ONLY, remember to remove this
+
         end
 
       % else, check states of elevators in Elevators

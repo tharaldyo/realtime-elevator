@@ -20,7 +20,7 @@ state_idle() ->
     {drive, Direction} -> %{move, Direction} ->
       driverman ! {set_motor, Direction},
       state_driving();
-    {floor_reached} ->
+    floor_reached ->
       state_doors_open()
 
     after 5000 ->
