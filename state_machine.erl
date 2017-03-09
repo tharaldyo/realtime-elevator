@@ -17,7 +17,8 @@ state_idle() ->
   io:format("elevator says: hello, I'm idle! ~n"),
   elevatorman ! idle,
   receive
-    {move} -> %{move, Direction} ->
+    {drive, Direction} -> %{move, Direction} ->
+      driverman ! {set_motor, Direction},
       state_driving();
     {floor_reached} ->
       state_doors_open()
@@ -29,12 +30,12 @@ state_idle() ->
 state_driving() ->
   io:format("hello from driving ~n"),
   receive
-    {floor_reached} ->
-      elevatorman ! {set_motor, stop},
+    floor_reached ->
+      driverman ! {set_motor, stop},
       state_doors_open();
-    {floor_passed} ->
+    floor_passed ->
       state_driving();
-    {endpoint} ->
+    endpoint ->
       driverman ! {set_motor, stop},
       state_idle()
 
@@ -42,21 +43,23 @@ state_driving() ->
       state_lost()
     end.
 
-
-
 state_doors_open() ->
-  io:format("hello from doors_open ~n").
+  elevatorman ! {doors, open},
+  timer:sleep(2000),
+  elevatorman ! {doors, close},
+  state_idle().
+  %io:format("hello from doors_open ~n").
 
 state_lost() ->
   elevatorman ! lost,
   receive
-    {floor_reached} ->
+    floor_reached ->
       elevatorman ! {set_motor, stop},
       state_idle();
-    {floor_passed} ->
+    floor_passed ->
       elevatorman ! {set_motor, stop},
       state_idle();
-    {endpoint} ->
+    endpoint ->
       elevatorman ! {set_motor, stop},
       state_idle()
   end.

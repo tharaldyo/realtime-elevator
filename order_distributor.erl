@@ -14,11 +14,11 @@ distributor() ->
       % check if any orders are available, else send [] to the elevator making the request
       orderman ! {get_orders, self()},
       receive
-        [] ->
+        {orders, []} ->
           io:format("no orders available, sending empty list ~n"),
-          elevatorman ! [];
+          elevatorman ! {order, []};
 
-        OrderList -> % get first order in queue (FIFO)
+        {orders, OrderList} -> % get first order in queue (FIFO)
           [Order|_Disregard] = OrderList,
           io:format("order received: ~p~n", [Order]), %debug
           % check if the order has direction "command" (comes from inside the elevator)
@@ -26,11 +26,12 @@ distributor() ->
             command ->
               % if yes, send order to "local" elevator
               io:format("received a command order, local elevator gets it ~n"), %debug
-              elevatorman ! Order#order.floor;
+              elevatorman ! {order, Order#order.floor};
 
             _ ->
               Executor = find_best_elevator(Order),
               io:format("The executor: ~p~n", [Executor]) %debug
+              % send order to executor
 
 
           end

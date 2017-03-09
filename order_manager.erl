@@ -46,7 +46,7 @@ order_queue(Orders) ->
 
 		{get_orders, PID} ->
 			io:format("get_orders received ~n"),
-			PID ! Orders,
+			PID ! {orders, Orders},
 			order_queue(Orders)
 			%?MODULE:order_queue(dets:to_list(dets:from_list(Orders)))
 
