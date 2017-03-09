@@ -31,12 +31,18 @@ order_queue(Orders) ->
 	io:format("Orderlist: ~p~n", [Orders]),
 
 	receive
-		{add_order, NewOrder} when 1<2 ->
-			dets:open_file(order_table, [{type, bag}]),
-			io:format("Syntax: ~p~n", [NewOrder]),
-			dets:insert(order_table, NewOrder),
-			dets:close(order_table),
-			order_queue(Orders ++ [NewOrder]);
+		{add_order, NewOrder} ->
+			case sets:is_element(NewOrder, sets:from_list(Orders)) of
+				false ->
+					dets:open_file(order_table, [{type, bag}]),
+					io:format("Syntax: ~p~n", [NewOrder]),
+					dets:insert(order_table, NewOrder),
+					dets:close(order_table),
+					order_queue(Orders ++ [NewOrder]);
+				true ->
+					io:format("Order already exists.~n")
+					order_queue(Orders)
+				end.
 
 		{remove_order, Order} ->
 			dets:open_file(order_table, [{type, bag}]),
