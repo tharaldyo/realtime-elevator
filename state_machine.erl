@@ -2,9 +2,10 @@
 -export([start/0]).
 
 start() ->
-  spawn(fun state_initializing/0).
+  state_initializing().
 
 state_initializing() ->
+  io:format("state_machine initializing~n"),
   elevatorman ! {fsm, intializing},
   receive {floor_reached} ->
     elevatorman ! {fsm, initialized}
@@ -13,13 +14,17 @@ state_initializing() ->
   state_idle().
 
 state_idle() ->
+  io:format("elevator says: hello, I'm idle! ~n"),
   elevatorman ! idle,
   receive
     {move} -> %{move, Direction} ->
       state_driving();
     {floor_reached} ->
       state_doors_open()
-    end.
+
+    after 5000 ->
+        state_idle()
+  end.
 
 state_driving() ->
   io:format("hello from driving ~n"),

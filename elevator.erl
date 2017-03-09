@@ -10,7 +10,7 @@ start() ->
 
 	register(elevatorman, spawn(fun elevator_manager/0)),
 
-	register(fsm, state_machine:start()),
+	register(fsm,spawn(fun state_machine:start/0)),
 
 	%nameman ! {get_name, self()},
 	%NodeName = receive _ -> NodeName end,
@@ -42,6 +42,15 @@ driver_manager_loop() ->
 		{floor_reached, Floor} ->
 			elevatorman ! {floor_reached, Floor};
 
+		{set_motor, Direction} ->
+			elev_driver:set_motor_direction(Direction);
+
+		{open_door} ->
+			elev_driver:set_door_open_lamp(on);
+
+		{close_door} ->
+			elev_driver:set_door_open_lamp(off);
+
 		_Message ->
 			io:format("~p~n", [_Message])
 		end,
@@ -52,19 +61,18 @@ elevator_manager() ->
 
 	% make sure fsm and state manager initialize correctly
 	receive {fsm, intializing} -> ok end,
-	receive {stateman, initialized} -> ok end,
-
-	% TODO: remember to test this with the elevator!
+	io:format("Setting motor dir down~n"),
 	driverman ! {set_motor, down},
 	receive {floor_reached, NewFloor} ->
-		elevatorman ! {set_motor, stop},
+		driverman ! {set_motor, stop},
 		stateman ! {update_state, floor, NewFloor},
 		fsm ! {floor_reached}
 	end,
 
+	% TODO: remember to test this with the elevator
+
 	receive {fsm, initialized} -> ok end,
 
-	timer:sleep(500), %debug
 	io:format("Elevator initialized, ready for action. ~n"), %debug
 
 	elevator_manager_loop().
@@ -76,42 +84,42 @@ elevator_manager_loop() ->
 			stateman ! {update_state, floor, NewFloor};
 			%stateman ! {get_state, self()},
 
-		{idle} ->
+		idle ->
 			stateman ! {update_state, state, idle},
 			% delay here to prevent multiple elevators attempting to invoke order distribution simultaneously
 			% possible problem: elevators calling distributor at the same time when multiple elevators are idle?
 
 			% this stuff below belongs in order_distributor
-			orderman ! {get_orders, self()},
+			distributor ! get_floor,
+			io:format("sent get_floor to distributor, awaiting response ~n"),
+
 			receive
 				[] ->
-					io:format("received empty list, no orders available"); %debug
-				OrderList ->
-					io:format("Orders received: ~p~n", [OrderList]), %debug
-					[MyOrder|_Disregard] = OrderList,
-					io:format("my order: ~p~n", [MyOrder]), %debug
+					io:format("received empty list, no orders available OR no order for me"); %debug
+
+				OrderFloor ->
+					io:format("received an order floor: ~p~n", [OrderFloor]),
+					stateman ! {update_state, state, busy},
 					stateman ! get_state,
-
-					% this stuff can stay here
-					% let order_distributor return a goal floor, then we decide where to go in here
 					CurrentFloor = receive {_Name, _State, Floor, _Direction} -> Floor end,
-					Difference = CurrentFloor - element(2, MyOrder),
 					if
-						Difference < 0 ->
-							io:format("something ~n");
-						Difference > 0 ->
-							io:format("something ~n")
+						CurrentFloor - OrderFloor == 0 ->
+							driverman ! open_door;
+						CurrentFloor - OrderFloor < 0 ->
+							driverman ! {set_motor, up},
+							stateman ! {update_state, direction, up};
+						CurrentFloor - OrderFloor > 0 ->
+							driverman ! {set_motor, down},
+							stateman ! {update_state, direction, down}
 					end
-
 					%orderman ! {remove_order, MyOrder} % do this somewhere else
 			end
 		end,
 
-	timer:sleep(5000),
 	elevator_manager_loop().
 
 state_manager(NodeName, State, Floor, Direction) ->
-	io:format("hello from state manager ~n"), %debug
+	io:format("statemanager has been called ~n"), %debug
 	%nameman ! {get_name, self()},
 
 

@@ -31,11 +31,10 @@ order_queue(Orders) ->
 	io:format("Orderlist: ~p~n", [Orders]),
 
 	receive
-		{add_order, NewOrder} ->
+		{add_order, NewOrder} when 1<2 ->
 			dets:open_file(order_table, [{type, bag}]),
 			io:format("Syntax: ~p~n", [NewOrder]),
 			dets:insert(order_table, NewOrder),
-
 			dets:close(order_table),
 			order_queue(Orders ++ [NewOrder]);
 
