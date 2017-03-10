@@ -3,23 +3,13 @@
 
 start() ->
 	order_manager:start(),
-
 	register(driverman, spawn(fun driver_manager/0)),
-
 	connection_manager:start(),
-
 	register(elevatorman, spawn(fun elevator_manager/0)),
-
 	register(fsm,spawn(fun state_machine:start/0)),
-
-	%nameman ! {get_name, self()},
-	%NodeName = receive _ -> NodeName end,
-
 	register(stateman, spawn(?MODULE, state_manager, [placeholder, init, -1, down, -1])),
 	nameman ! {get_name, stateman},
-
 	register(distributor, spawn(fun order_distributor:start/0)),
-
 	io:format("Elevator pid: ~p~n", [self()]).
 
 driver_manager() ->
@@ -82,13 +72,17 @@ elevator_manager_loop() ->
 			io:format("FLOOR ~p ---------------------- ~n", [NewFloor]),
 			stateman ! {update_state, floor, NewFloor},
 			stateman ! {get_state, self()},
-			OrderFloor = receive {_Name, _State, _Floor, _Direction, Target} -> Target end,
-			stateman ! {get_state, self()},
-			ElevDir = receive {_Name, _State, _Floor, Direction, _Target} -> Direction end,
+
+			receive {_Name, _State, _Floor, Direction, Target} ->
+				TargetFloor = Target,
+				Direction = Direction
+			end,
+
 			case NewFloor of
-				OrderFloor ->
+				TargetFloor ->
 					fsm ! floor_reached,
-					io:format("Target floor reached.~n");
+					io:format("~s~n", [color:red("TARGET FLOOR REACHED.")]),
+					driverman ! {set_motor, stop};
 					%clear_all_floors_at(NewFloor)
 				_ ->
 					fsm ! floor_passed,
@@ -111,26 +105,27 @@ elevator_manager_loop() ->
 					receive
 						{orders, GlobalOrders} ->
 							io:format("Orders: ~p~n", [GlobalOrders]),
-							GlobalOrdersInSameDir = lists:filter(fun({_A,Floor,Dir}) -> (Dir==ElevDir) and (Floor==NewFloor) end, GlobalOrders),
+							GlobalOrdersInSameDir = lists:filter(fun({_A,Floor,Dir}) -> (Dir==Direction) and (Floor==NewFloor) end, GlobalOrders),
 							io:format("Adding: ~p~n", [GlobalOrdersInSameDir])
 					end,
 
 					% Now have a list of orders in same dir. If there are any orders in this list
 					% we want to stop, open door, continue on! Consider putting code below
 					% into a "open_for_new_passengers"-function
-					case [LocalOrdersInSameDir]++[GlobalOrdersInSameDir] of
+					io:format("~s, ~p~n", [color:red("Orders I remove at this floor:"), LocalOrdersInSameDir++GlobalOrdersInSameDir]),
+					case LocalOrdersInSameDir++GlobalOrdersInSameDir of
 						[] ->
 							io:format("No orders at this floor :-) ~n");
-						StuffAtThisFloor ->
+						_StuffAtThisFloor ->
 							driverman ! {set_motor, stop},
 							driverman ! {open_door},
 							timer:sleep(3000),
 							driverman ! {close_door},
 							lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersInSameDir),
 							lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersInSameDir),
-							driverman ! {set_motor, ElevDir}
+							driverman ! {set_motor, Direction},
+							io:format("~s, ~p~n", [color:red("Finished: "), LocalOrdersInSameDir++GlobalOrdersInSameDir])
 						end
-
 			end;
 
 		idle ->
@@ -169,7 +164,6 @@ elevator_manager_loop() ->
 					%orderman ! {remove_order, MyOrder} % do this somewhere else
 			end
 		end,
-
 	elevator_manager_loop().
 
 state_manager(NodeName, State, Floor, Direction, TargetFloor) ->

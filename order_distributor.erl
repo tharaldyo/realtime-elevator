@@ -19,7 +19,7 @@ distributor() ->
 
         {orders, LocalOrderList} ->
           [LocalOrder|_D] = LocalOrderList,
-          io:format("local order received: ~p~n", [LocalOrder]), %debug
+          %io:format("local order received: ~p~n", [LocalOrder]), %debug
           elevatorman ! {order, LocalOrder#order.floor},
           order_manager:remove_order(localorderman, LocalOrder)
 

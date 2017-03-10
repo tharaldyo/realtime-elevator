@@ -28,7 +28,7 @@ state_idle() ->
   end.
 
 state_driving() ->
-  %io:format("hello from driving ~n"),
+  io:format("DRIVING ~n"),
   receive
     floor_reached ->
       driverman ! {set_motor, stop},
@@ -52,6 +52,8 @@ state_doors_open() ->
 
 state_lost() ->
   elevatorman ! lost,
+  io:format("~s,~n", [color:red("ELEVATOR IS STUCK!")]),
+  % return my order back to the queue!
   receive
     floor_reached ->
       elevatorman ! {set_motor, stop},

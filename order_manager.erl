@@ -1,6 +1,14 @@
 -module(order_manager).
--export([start/0, add_order/2, remove_order/2]).
 -record(order, {floor, direction}).
+-export([	start/0,
+ 					add_order/2,
+					remove_order/2,
+					get_orders/1 ]).
+
+%% TODO:
+%% As it stand the queues are spawned, but the whole queue system is wrapped in
+%% a "synchronous" layer... Interafce should be 100% message based, so will have
+%% to add records elsewhere as well.
 
 start() ->
 	order_queue_init(global_order_table, orderman),
@@ -12,15 +20,19 @@ add_order(Floor, Direction) ->
 			localorderman ! {add_order, #order{floor = Floor, direction = Direction}};
 		_Else ->
 			orderman ! {add_order, #order{floor = Floor, direction = Direction}}
-			%lists:foreach(fun(Node) -> {orderman, Node} ! {add_order, #order{floor = Floor, direction = Direction}} end, nodes())
-			end.
+	end.
 
 remove_order(QueueName, Order) ->
-	io:format("removing order: ~p~n", [Order]),
-	QueueName ! {remove_order, Order},
-	io:format("Goes wrong: ~p ~p~n", [QueueName, Order]),
-	case QueueName of orderman ->
-		lists:foreach(fun(Node) -> {orderman, Node} ! {remove_order, Order} end, nodes())
+	io:format("remove_order(QueueName, Order)~n"),
+	{_,Floor,Direction} = Order,
+	io:format("Floor: ~p, Direction: ~p~n", [Floor, Direction]),
+	QueueName ! {remove_order, #order{floor = Floor, direction = Direction}}.
+
+get_orders(QueueName) ->
+	QueueName ! get_orders,
+	receive
+		Orders ->
+			Orders
 	end.
 
 order_queue_init(FileName, QueueName) ->
@@ -28,36 +40,36 @@ order_queue_init(FileName, QueueName) ->
 	dets:open_file(FileName, [{type, bag}]),
 	OrdersFromDisk = dets:lookup(FileName, order),
 	dets:close(FileName),
-	register(QueueName, spawn(fun() -> order_queue(OrdersFromDisk) end)).
+	register(QueueName, spawn(fun() -> order_queue(OrdersFromDisk, FileName) end)).
 
-order_queue(Orders) ->
+order_queue(Orders, FileName) ->
 	io:format("Orderlist: ~p~n", [Orders]),
 	receive
 		{add_order, NewOrder} ->
 			io:format("Adding new order.~n"),
 			case sets:is_element(NewOrder, sets:from_list(Orders)) of
 				false ->
-					dets:open_file(order_table, [{type, bag}]),
+					dets:open_file(FileName, [{type, bag}]),
 					%io:format("Syntax: ~p~n", [NewOrder]), %debug
-					dets:insert(order_table, NewOrder),
-					dets:close(order_table),
-					order_queue(Orders ++ [NewOrder]);
+					dets:insert(FileName, NewOrder),
+					dets:close(FileName),
+					order_queue(Orders ++ [NewOrder], FileName);
 				true ->
 					io:format("Order already exists.~n"), %debug
-					order_queue(Orders)
+					order_queue(Orders, FileName)
 			end;
 
 		{remove_order, Order} ->
 			io:format("removing order: ~p~n", [Order]),
-			dets:open_file(order_table, [{type, bag}]),
-			dets:delete_object(order_table, Order),
-			dets:close(order_table),
-			order_queue(Orders--[Order]);
+			dets:open_file(FileName, [{type, bag}]),
+			dets:delete_object(FileName, Order),
+			dets:close(FileName),
+			order_queue(Orders--[Order], FileName);
 
 		{get_orders, PID} ->
 			io:format("get_orders received ~n"),
 			PID ! {orders, Orders},
-			order_queue(Orders)
+			order_queue(Orders, FileName)
 		end.
 
 	% HOW TO HANDLE NETWORK SPLITS

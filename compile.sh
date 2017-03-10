@@ -1,13 +1,13 @@
 echo
 echo "---------------------------------------------------------"
-echo -e "\e[1m ERLANG COMPILER OUTPUT \e[21m"
+echo "ERLANG COMPILER OUTPUT"
 echo "---------------------------------------------------------"
 erlc *.erl;
 mkdir ebin/ 2> /dev/null;
 mv *.beam ebin/;
 make -C driver / > /dev/null;
 cd ebin/;
-rm order_table local_order_table global_order_table
+rm local_order_table global_order_table 2> /dev/null
 echo "---------------------------------------------------------"
 echo
 erl;
