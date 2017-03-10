@@ -50,9 +50,9 @@ order_queue(Orders, FileName) ->
 			case sets:is_element(NewOrder, sets:from_list(Orders)) of
 				false ->
 					dets:open_file(FileName, [{type, bag}]),
-					%io:format("Syntax: ~p~n", [NewOrder]), %debug
 					dets:insert(FileName, NewOrder),
 					dets:close(FileName),
+          elev_driver:set_button_lamp(element(2, NewOrder),element(3, NewOrder), on),
 					order_queue(Orders ++ [NewOrder], FileName);
 				true ->
 					io:format("Order already exists.~n"), %debug

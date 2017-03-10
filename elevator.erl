@@ -59,10 +59,7 @@ elevator_manager() ->
 		fsm ! {floor_reached}
 	end,
 
-	% TODO: remember to test this with the elevator
-
 	receive {fsm, initialized} -> ok end,
-
 	io:format("Elevator initialized, ready for action. ~n"), %debug
 	elevator_manager_loop().
 
@@ -71,12 +68,10 @@ elevator_manager_loop() ->
 		{floor_reached, NewFloor} ->
 			io:format("FLOOR ~p ---------------------- ~n", [NewFloor]),
 			stateman ! {update_state, floor, NewFloor},
-			stateman ! {get_state, self()},
-
-			receive {_Name, _State, _Floor, Direction, Target} ->
-				TargetFloor = Target,
-				Direction = Direction
-			end,
+			stateman ! {get_floor, self()},
+			TargetFloor = receive F -> F end,
+			stateman ! {get_direction, self()},
+			Direction = receive D -> D end,
 
 			case NewFloor of
 				TargetFloor ->
@@ -167,6 +162,9 @@ elevator_manager_loop() ->
 	elevator_manager_loop().
 
 state_manager(NodeName, State, Floor, Direction, TargetFloor) ->
+	io:format("statemanager has been called ~n"), %debug
+	%nameman ! {get_name, self()},
+
 		receive
 			{node_name, NewName} ->
 				state_manager(NewName, State, Floor, Direction, TargetFloor);
@@ -175,6 +173,7 @@ state_manager(NodeName, State, Floor, Direction, TargetFloor) ->
 				state_manager(NodeName, NewState, Floor, Direction, TargetFloor);
 
 			{update_state, floor, NewFloor} ->
+				elev_driver:set_floor_indicator(NewFloor),
 				state_manager(NodeName, State, NewFloor, Direction, TargetFloor);
 
 			{update_state, direction, NewDirection} ->
@@ -185,5 +184,14 @@ state_manager(NodeName, State, Floor, Direction, TargetFloor) ->
 
 			{get_state, Receiver} ->
 				Receiver ! {NodeName, State, Floor, Direction, TargetFloor},
-				state_manager(NodeName, State, Floor, Direction, TargetFloor)
+				state_manager(NodeName, State, Floor, Direction, TargetFloor);
+
+			{get_target_floor, Receiver} ->
+				Receiver ! TargetFloor;
+
+			{get_direction, Receiver} ->
+				Receiver ! Direction;
+
+			{get_floor, Receiver} ->
+				Receiver ! Floor
 			end.
