@@ -152,6 +152,12 @@ elevator_manager_loop() ->
 
 				{order, Order} ->
 					io:format("received an order: ~p~n", [Order]),
+
+					case Order#order.direction of
+						command -> ok;
+						_D -> watchdog ! {elevator, add_order, Order}
+					end,
+
 					OrderFloor = Order#order.floor,
 					stateman ! {update_state, state, busy},
 					stateman ! {update_state, order, Order},
@@ -168,7 +174,6 @@ elevator_manager_loop() ->
 									order_manager:remove_order(localorderman, Order);
 								% TODO: write the local order to disk?
 								_Direction ->
-									watchdog ! {elevator, add_order, Order},
 									order_manager:remove_order(orderman, Order)
 							end,
 							fsm ! floor_reached;
@@ -197,7 +202,7 @@ watchdog_loop(WatcherList) ->
 		{elevator, Action, Order} -> % Action is either add_order or remove_order
 			lists:foreach(fun(Node) ->
 				 {watchdog, Node} ! {network, Action, Order},
-				 io:format("Broadcasting order: ~p to node ~p~n", [Order, Node])
+				 io:format("WATCHDOG: Broadcasting order: ~p to node ~p~n", [Order, Node])
 			  end, nodes()),
 			watchdog_loop(WatcherList);
 
@@ -207,10 +212,17 @@ watchdog_loop(WatcherList) ->
 			watchdog_loop(WatcherList++{PID, Order});
 
 		{network, remove_order, Order} ->
-			Watcher = lists:keyfind(Order, 2, WatcherList),
-			WatcherPID = element(1, Watcher), % sort of redundant, can do this and send message in one line instead
-			WatcherPID ! completed,
-			watchdog_loop(WatcherList--[Watcher])
+			WatcherTuple = lists:keyfind(Order, 2, WatcherList),
+			case Watcher of
+				false ->
+					io:format("WATCHDOG: Error: this order is not being watched: ~p~n", [Order]),
+					watchdog_loop(WatcherList);
+				Watcher ->
+					io:format("WATCHDOG: His watch has ended: ~p~n", [Watcher]),
+					WatcherPID = element(1, Watcher), % sort of redundant, can do this and send message in one line instead
+					WatcherPID ! completed,
+					watchdog_loop(WatcherList--[Watcher])
+			end
 
 	end.
 
