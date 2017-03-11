@@ -188,6 +188,7 @@ elevator_manager_loop() ->
 					end
 					%orderman ! {remove_order, MyOrder} % do this somewhere else
 			end
+
 		end,
 	elevator_manager_loop().
 
@@ -209,11 +210,11 @@ watchdog_loop(WatcherList) ->
 		{network, add_order, Order} ->
 			PID = spawn(fun() -> watcher_process(Order) end),
 			io:format("WATCHDOG: Adding this to the WatcherList: ~p~n", [{PID, Order}]),
-			watchdog_loop(WatcherList++{PID, Order});
+			watchdog_loop(WatcherList++[{PID, Order}]);
 
 		{network, remove_order, Order} ->
 			WatcherTuple = lists:keyfind(Order, 2, WatcherList),
-			case Watcher of
+			case WatcherTuple of
 				false ->
 					io:format("WATCHDOG: Error: this order is not being watched: ~p~n", [Order]),
 					watchdog_loop(WatcherList);

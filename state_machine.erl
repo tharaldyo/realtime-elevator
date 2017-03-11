@@ -55,7 +55,7 @@ state_doors_open() ->
   %io:format("hello from doors_open ~n").
 
 state_lost() ->
-  elevatorman ! lost,
+  stateman ! {update_state, state, lost}, % TODO: decide whether to send this to elevatorman or stateman
   io:format("~s,~n", [color:red("ELEVATOR IS LOST!")]),
 
   receive
