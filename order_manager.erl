@@ -27,7 +27,12 @@ remove_order(QueueName, Order) ->
 	io:format("remove_order(~p, ~p)~n", [QueueName, Order]),
 	{_,Floor,Direction} = Order,
 	%io:format("Floor: ~p, Direction: ~p~n", [Floor, Direction]),
-	QueueName ! {remove_order, #order{floor = Floor, direction = Direction}}.
+	QueueName ! {remove_order, #order{floor = Floor, direction = Direction}},
+  case QueueName of
+    orderman ->
+      foreach(fun(Node) -> {orderman, Node} ! {remove_order, Order} end, nodes());
+    _ -> ok
+  end.
 
 get_orders(QueueName) ->
 	QueueName ! get_orders,

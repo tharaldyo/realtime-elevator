@@ -128,6 +128,7 @@ elevator_manager_loop() ->
 			end;
 
 		idle ->
+			io:format("elevatorman received idle message, updating state and asking for order ~n"),
 			stateman ! {update_state, state, idle},
 			stateman ! {update_state, target_floor, -1},
 			% delay here to prevent multiple elevators attempting to invoke order distribution simultaneously
