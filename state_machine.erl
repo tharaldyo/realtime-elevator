@@ -14,7 +14,7 @@ state_initializing() ->
   state_idle().
 
 state_idle() ->
-  io:format("elevator says: hello, I'm idle! ~n"),
+  io:format("~nelevator says: hello, I'm idle! ~n"),
   elevatorman ! idle,
   receive
     {drive, Direction} ->

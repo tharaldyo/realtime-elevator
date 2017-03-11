@@ -122,7 +122,7 @@ elevator_manager_loop() ->
 							io:format("elevman removing~n"),
 							lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
 							lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersOnFloorInDirection),
-							io:format("DRIVING ON! <------ ~n"),
+							%io:format("DRIVING ON! <------ ~n"),
 							io:format("~s, ~p~n", [color:red("Finished: "), LocalOrdersOnFloor++GlobalOrdersOnFloorInDirection])
 						end
 			end;
@@ -139,7 +139,7 @@ elevator_manager_loop() ->
 
 			receive
 				{order, []} ->
-					io:format("~n"),
+					%io:format("~n"),
 					io:format("received empty list, no orders available OR no order for me ~n"); %debug
 
 				{order, Order} ->
