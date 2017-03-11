@@ -94,6 +94,7 @@ get_all_elevators(Order) ->
             case element(4, Elevator) of % check elevator direction
               up ->
                 % check if order floor is between the elevator and its destination
+                % TODO: fix rare bug where the seq fails because direction is not correct?
                 case lists:member(Order#order.floor, lists:seq(element(3, Elevator), element(5, Elevator))) of
                    true ->
                     ListCreator ! {add_elevator, Elevator};

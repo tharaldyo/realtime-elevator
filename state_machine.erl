@@ -17,9 +17,10 @@ state_idle() ->
   io:format("elevator says: hello, I'm idle! ~n"),
   elevatorman ! idle,
   receive
-    {drive, Direction} -> %{move, Direction} ->
+    {drive, Direction} ->
       io:format("I received a command to start driving, I will start driving now ~n"),
       driverman ! {set_motor, Direction},
+      stateman ! {update_state, direction, Direction},
       state_driving();
     floor_reached ->
       state_doors_open()

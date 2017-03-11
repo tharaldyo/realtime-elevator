@@ -18,8 +18,9 @@ add_order(Floor, Direction) ->
 	case Direction of
 		command ->
 			localorderman ! {add_order, #order{floor = Floor, direction = Direction}};
-		_Else ->
-			orderman ! {add_order, #order{floor = Floor, direction = Direction}}
+		OtherDirection ->
+			orderman ! {add_order, #order{floor = Floor, direction = Direction}},
+      broadcast_orders()
 	end.
 
 remove_order(QueueName, Order) ->
@@ -51,11 +52,6 @@ order_queue(Orders, FileName) ->
 					dets:open_file(FileName, [{type, bag}]),
 					dets:insert(FileName, NewOrder),
 					dets:close(FileName),
-          if FileName == global_order_table ->
-              broadcast_orders(Orders++[NewOrder]);
-            true->
-              io:format("~n")
-          end,
           elev_driver:set_button_lamp(element(2, NewOrder),element(3, NewOrder), on),
 					order_queue(Orders ++ [NewOrder], FileName);
 				true ->
@@ -75,6 +71,10 @@ order_queue(Orders, FileName) ->
 		end.
 
 % this function should be used to remove
-broadcast_orders(Orders) ->
-  ok.
-%	lists:foreach(fun(Item) -> io:format("Sending order over network!~n") end, Orders).
+broadcast_orders() ->
+  orderman ! {get_orders, self()},
+  GlobalOrders = receive {orders, Orders} -> Orders end,
+
+  lists:foreach(fun(Node) ->
+    lists:foreach(fun(Order) -> {orderman, Node} ! {add_order, Order} end, Orders)
+  end, nodes()).

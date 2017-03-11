@@ -163,12 +163,12 @@ elevator_manager_loop() ->
 							fsm ! floor_reached;
 						CurrentFloor - OrderFloor < 0 ->
 							io:format("order received, telling FSM to start driving ASAP ~n"),
-							fsm ! {drive, up},
-							stateman ! {update_state, direction, up};
+							fsm ! {drive, up};
+							%stateman ! {update_state, direction, up};
 						CurrentFloor - OrderFloor > 0 ->
 							io:format("order received, telling FSM to start driving ASAP ~n"),
-							fsm ! {drive, down},
-							stateman ! {update_state, direction, down}
+							fsm ! {drive, down}
+							%stateman ! {update_state, direction, down}
 					end
 					%orderman ! {remove_order, MyOrder} % do this somewhere else
 			end
