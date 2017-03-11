@@ -204,7 +204,7 @@ watchdog_loop(WatcherList) ->
 			lists:foreach(fun(Node) ->
 				 {watchdog, Node} ! {network, Action, Order},
 				 io:format("WATCHDOG: Broadcasting order: ~p to node ~p~n", [Order, Node])
-			  end, nodes()),
+			 end, [node()|nodes()]),
 			watchdog_loop(WatcherList);
 
 		{network, add_order, Order} ->
@@ -235,6 +235,7 @@ watcher_process(Order) ->
 	after
 		20000 -> % TODO: tweak this?
 			io:format("WATCHER: order took too long, adding it back to the queue! ~n"),
+			watchdog ! {elevator, remove_order, Order},
 			order_manager:add_order(Order#order.floor, Order#order.direction)
 	end. % TODO: should die here automatically, maybe check if it does?
 

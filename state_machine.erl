@@ -1,6 +1,6 @@
 -module(state_machine).
 -export([start/0]).
--record(order, {floor, direction}).
+%-record(order, {floor, direction}). %debug
 
 start() ->
   state_initializing().

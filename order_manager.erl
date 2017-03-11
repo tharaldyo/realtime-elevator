@@ -18,7 +18,7 @@ add_order(Floor, Direction) ->
 	case Direction of
 		command ->
 			localorderman ! {add_order, #order{floor = Floor, direction = Direction}};
-		OtherDirection ->
+		_Other ->
 			orderman ! {add_order, #order{floor = Floor, direction = Direction}},
       broadcast_orders()
 	end.
@@ -81,5 +81,5 @@ broadcast_orders() ->
   GlobalOrders = receive {orders, Orders} -> Orders end,
 
   lists:foreach(fun(Node) ->
-    lists:foreach(fun(Order) -> {orderman, Node} ! {add_order, Order} end, Orders)
+    lists:foreach(fun(Order) -> {orderman, Node} ! {add_order, Order} end, GlobalOrders)
   end, nodes()).
