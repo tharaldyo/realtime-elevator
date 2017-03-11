@@ -11,6 +11,7 @@ start() ->
 	register(stateman, spawn(?MODULE, state_manager, [placeholder, init, -1, down, {#order{floor = -1, direction = down}}])),
 	nameman ! {get_name, stateman},
 	register(distributor, spawn(fun order_distributor:start/0)),
+	register(watchdog, spawn(fun watchdog/0)),
 	io:format("Elevator pid: ~p~n", [self()]).
 
 driver_manager() ->
@@ -72,8 +73,9 @@ elevator_manager_loop() ->
 		{floor_reached, NewFloor} ->
 			io:format("FLOOR ~p ---------------------- ~n", [NewFloor]),
 			stateman ! {update_state, floor, NewFloor},
-			stateman ! {get_target_floor, self()},
-			TargetFloor = receive {target_floor, F} -> F end,
+			stateman ! {get_current_order, self()},
+			CurrentOrder = receive {target_floor, O} -> O end,
+			TargetFloor = CurrentOrder#order.floor,
 			io:format("Current target floor: ~p~n", [TargetFloor]),
 			stateman ! {get_direction, self()},
 			Direction = receive {direction, D} -> D end,
@@ -95,9 +97,11 @@ elevator_manager_loop() ->
 				TargetFloor ->
 					io:format("~s~n", [color:red("TARGET FLOOR REACHED!")]),
 
+
 					%driverman ! {set_button_lamp, TargetFloor, Direction, off},
 					driverman ! {set_motor, stop}, %redundant?
 					%clear_all_floors_at(NewFloor)
+					watchdog ! {elevator, remove_order, Order},
 					lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
 					lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersOnFloor),
 					io:format("Additionally, I remove these orders from target floor: ~p~n", [LocalOrdersOnFloor++GlobalOrdersOnFloor]),
@@ -158,7 +162,9 @@ elevator_manager_loop() ->
 							case Order#order.direction of
 								command ->
 									order_manager:remove_order(localorderman, Order);
+								% TODO: write the local order to disk?
 								Direction ->
+									watchdog ! {elevator, add_order, Order},
 									order_manager:remove_order(orderman, Order)
 							end,
 							fsm ! floor_reached;
@@ -175,6 +181,24 @@ elevator_manager_loop() ->
 			end
 		end,
 	elevator_manager_loop().
+
+watchdog() ->
+	io:format("watchdog initialized ~n"),
+	watchdog_loop().
+
+watchdog_loop() ->
+	receive
+		{elevator, Action, Order} -> % Action is either add_order or remove_order
+			foreach(fun(Node) -> {watchdog, Node} ! {network, Action, Order} end, nodes());
+
+
+		{network, add_order, Order} ->
+		receive
+			{network, remove_order, Order} -> ok
+			after 20000 -> order_manager:add_order(Order#order.floor, Order#order.direction)
+
+
+	watchdog_loop().
 
 state_manager(NodeName, State, Floor, Direction, Order) ->
 	%io:format("statemanager has been called ~n"), %debug
