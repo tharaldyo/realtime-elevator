@@ -30,7 +30,7 @@ remove_order(QueueName, Order) ->
 	QueueName ! {remove_order, #order{floor = Floor, direction = Direction}},
   case QueueName of
     orderman ->
-      foreach(fun(Node) -> {orderman, Node} ! {remove_order, Order} end, nodes());
+      lists:foreach(fun(Node) -> {orderman, Node} ! {remove_order, Order} end, nodes());
     _ -> ok
   end.
 
