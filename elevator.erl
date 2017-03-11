@@ -8,7 +8,7 @@ start() ->
 	connection_manager:start(),
 	register(elevatorman, spawn(fun elevator_manager/0)),
 	register(fsm,spawn(fun state_machine:start/0)),
-	register(stateman, spawn(?MODULE, state_manager, [placeholder, init, -1, down, -1])),
+	register(stateman, spawn(?MODULE, state_manager, [placeholder, init, -1, down, {#order{floor = -1, direction = down}}])),
 	nameman ! {get_name, stateman},
 	register(distributor, spawn(fun order_distributor:start/0)),
 	io:format("Elevator pid: ~p~n", [self()]).
@@ -130,7 +130,7 @@ elevator_manager_loop() ->
 		idle ->
 			io:format("elevatorman received idle message, updating state and asking for order ~n"),
 			stateman ! {update_state, state, idle},
-			stateman ! {update_state, target_floor, -1},
+			%stateman ! {update_state, new_order, -1},
 			% delay here to prevent multiple elevators attempting to invoke order distribution simultaneously
 			% possible problem: elevators calling distributor at the same time when multiple elevators are idle?
 			% this stuff below belongs in order_distributor
@@ -146,7 +146,7 @@ elevator_manager_loop() ->
 					io:format("received an order floor: ~p~n", [Order]),
 					OrderFloor = Order#order.floor,
 					stateman ! {update_state, state, busy},
-					stateman ! {update_state, target_floor, OrderFloor},
+					stateman ! {update_state, new_order, Order},
 					% write OrderFloor to disk?
 					% then delete it from the orderlist in order_manager
 					stateman ! {get_current_floor, self()},
@@ -176,39 +176,42 @@ elevator_manager_loop() ->
 		end,
 	elevator_manager_loop().
 
-state_manager(NodeName, State, Floor, Direction, TargetFloor) ->
+state_manager(NodeName, State, Floor, Direction, Order) ->
 	%io:format("statemanager has been called ~n"), %debug
 	%nameman ! {get_name, self()},
 		receive
 			{node_name, NewName} ->
-				state_manager(NewName, State, Floor, Direction, TargetFloor);
+				state_manager(NewName, State, Floor, Direction, Order);
 
 			{update_state, state, NewState} ->
-				state_manager(NodeName, NewState, Floor, Direction, TargetFloor);
+				state_manager(NodeName, NewState, Floor, Direction, Order);
 
 			{update_state, floor, NewFloor} ->
 				elev_driver:set_floor_indicator(NewFloor),
-				state_manager(NodeName, State, NewFloor, Direction, TargetFloor);
+				state_manager(NodeName, State, NewFloor, Direction, Order);
 
 			{update_state, direction, NewDirection} ->
-				state_manager(NodeName, State, Floor, NewDirection, TargetFloor);
+				state_manager(NodeName, State, Floor, NewDirection, Order);
 
-			{update_state, target_floor, NewTargetFloor} ->
-				state_manager(NodeName, State, Floor, Direction, NewTargetFloor);
+			{update_state, new_order, NewOrder} ->
+				state_manager(NodeName, State, Floor, Direction, NewOrder);
 
 			{get_state, Receiver} ->
-				Receiver ! {elevator_state, {NodeName, State, Floor, Direction, TargetFloor}},
-				state_manager(NodeName, State, Floor, Direction, TargetFloor);
+				Receiver ! {elevator_state, {NodeName, State, Floor, Direction, Order}},
+				state_manager(NodeName, State, Floor, Direction, Order);
+
+			{get_current_order, Receiver} ->
+				Receiver ! {current_order, Order};
 
 			{get_target_floor, Receiver} ->
-				Receiver ! {target_floor, TargetFloor},
-			state_manager(NodeName, State, Floor, Direction, TargetFloor);
+				Receiver ! {target_floor, Order#order.floor},
+			state_manager(NodeName, State, Floor, Direction, Order);
 
 			{get_direction, Receiver} ->
 				Receiver ! {direction, Direction},
-				state_manager(NodeName, State, Floor, Direction, TargetFloor);
+				state_manager(NodeName, State, Floor, Direction, Order);
 
 			{get_current_floor, Receiver} ->
 				Receiver ! {current_floor, Floor},
-				state_manager(NodeName, State, Floor, Direction, TargetFloor)
+				state_manager(NodeName, State, Floor, Direction, Order)
 			end.

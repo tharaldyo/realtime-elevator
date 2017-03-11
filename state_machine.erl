@@ -1,5 +1,6 @@
 -module(state_machine).
 -export([start/0]).
+-record(order, {floor, direction}).
 
 start() ->
   state_initializing().
@@ -56,12 +57,12 @@ state_doors_open() ->
 state_lost() ->
   elevatorman ! lost,
   io:format("~s,~n", [color:red("ELEVATOR IS LOST!")]),
-  % return my order back to the queue!
+
   receive
     floor_reached ->
       elevatorman ! {set_motor, stop},
       state_idle();
     floor_passed ->
       elevatorman ! {set_motor, stop},
-      state_idle();
+      state_idle()
   end.
