@@ -195,11 +195,15 @@ watchdog_loop(WatcherList) ->
 
 	receive
 		{elevator, Action, Order} -> % Action is either add_order or remove_order
-			lists:foreach(fun(Node) -> {watchdog, Node} ! {network, Action, Order} end, nodes()),
+			lists:foreach(fun(Node) ->
+				 {watchdog, Node} ! {network, Action, Order},
+				 io:format("Broadcasting order: ~p to node ~p~n", [Order, Node])
+			  end, nodes()),
 			watchdog_loop(WatcherList);
 
 		{network, add_order, Order} ->
 			PID = spawn(fun() -> watcher_process(Order) end),
+			io:format("WATCHDOG: Adding this to the WatcherList: ~p~n", [{PID, Order}]),
 			watchdog_loop(WatcherList++{PID, Order});
 
 		{network, remove_order, Order} ->
