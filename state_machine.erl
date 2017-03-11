@@ -24,7 +24,7 @@ state_idle() ->
     floor_reached ->
       state_doors_open()
 
-    after 6000 ->
+    after 4000 ->
       io:format("state_idle just timed out, calling again =) ~n"),
       state_idle()
   end.

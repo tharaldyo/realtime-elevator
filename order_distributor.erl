@@ -13,7 +13,7 @@ distributor() ->
       localorderman ! {get_orders, self()},
       receive
         {orders, []} ->
-          io:format("no local orders available, checking global orders ~n"),
+          %io:format("no local orders available, checking global orders ~n"),
 
           orderman ! {get_orders, self()},
           receive
@@ -23,7 +23,7 @@ distributor() ->
 
             {orders, GlobalOrderList} -> % get first order in queue (FIFO)
               [GlobalOrder|_Disregard] = GlobalOrderList,
-              io:format("order received: ~p~n", [GlobalOrder]), %debug
+              %io:format("order received: ~p~n", [GlobalOrder]), %debug
               {Executor, Others} = get_best_elevator(GlobalOrder),
               %io:format("The executor: ~p~n", [list_to_atom(element(1, Executor))]), %debug
               %io:format("will receive this floor: ~p~n", [Order#order.floor]),
@@ -35,7 +35,7 @@ distributor() ->
                   case element(2, Executor) of
                     idle ->
                       {elevatorman, list_to_atom(element(1, Executor))} ! {order, GlobalOrder},
-                      io:format("order_distributor removing~n"),
+                      %io:format("order_distributor removing~n"),
                       order_manager:remove_order(orderman, GlobalOrder);
 
                     busy ->
@@ -53,7 +53,7 @@ distributor() ->
           [LocalOrder|_D] = LocalOrderList,
           %io:format("local order received: ~p~n", [LocalOrder]), %debug
           elevatorman ! {order, LocalOrder},
-          io:format("order_distributor removing~n"),
+          %io:format("order_distributor removing~n"),
           order_manager:remove_order(localorderman, LocalOrder)
 
       end
@@ -68,8 +68,8 @@ get_best_elevator(Order) ->
   io:format("Costlist looks like: ~p~n", [CostList]),
   case CostList of
     [] ->
-      Executor = [],
-      io:format("tried to find best elevator, but no elevators are available at the moment ~n");
+      Executor = [];
+      %io:format("tried to find best elevator, but no elevators are available at the moment ~n");
 
     CostList ->
       [{_Cost, Executor} | _Disregard] = lists:keysort(1, CostList)
