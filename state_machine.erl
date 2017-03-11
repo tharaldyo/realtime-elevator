@@ -55,7 +55,7 @@ state_doors_open() ->
 
 state_lost() ->
   elevatorman ! lost,
-  io:format("~s,~n", [color:red("ELEVATOR IS STUCK!")]),
+  io:format("~s,~n", [color:red("ELEVATOR IS LOST!")]),
   % return my order back to the queue!
   receive
     floor_reached ->
@@ -64,7 +64,4 @@ state_lost() ->
     floor_passed ->
       elevatorman ! {set_motor, stop},
       state_idle();
-    endpoint ->
-      elevatorman ! {set_motor, stop},
-      state_idle()
   end.
