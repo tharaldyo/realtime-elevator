@@ -5,9 +5,9 @@ start() ->
   state_initializing().
 
 state_initializing() ->
-  io:format("state_machine initializing~n"),
+  %io:format("state_machine initializing~n"),
   elevatorman ! {fsm, intializing},
-  receive {floor_reached} ->
+  receive floor_reached ->
     elevatorman ! {fsm, initialized}
   end,
 
@@ -18,13 +18,15 @@ state_idle() ->
   elevatorman ! idle,
   receive
     {drive, Direction} -> %{move, Direction} ->
+      io:format("I received a command to start driving, I will start driving now ~n"),
       driverman ! {set_motor, Direction},
       state_driving();
     floor_reached ->
       state_doors_open()
 
-    after 5000 ->
-        state_idle()
+    after 6000 ->
+      io:format("state_idle just timed out, calling again =) ~n"),
+      state_idle()
   end.
 
 state_driving() ->
@@ -38,15 +40,15 @@ state_driving() ->
     endpoint ->
       driverman ! {set_motor, stop},
       state_idle()
-      
+
     after 10000 ->
       state_lost()
     end.
 
 state_doors_open() ->
-  elevatorman ! {doors, open},
+  driverman ! open_door,
   timer:sleep(2000),
-  elevatorman ! {doors, close},
+  elevatorman ! close_door,
   state_idle().
   %io:format("hello from doors_open ~n").
 

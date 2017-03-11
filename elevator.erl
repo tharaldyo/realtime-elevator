@@ -1,5 +1,6 @@
 -module(elevator).
 -export([start/0, state_manager/5]).
+-record(order, {floor, direction}).
 
 start() ->
 	order_manager:start(),
@@ -34,17 +35,15 @@ driver_manager_loop() ->
 		{set_motor, Direction} ->
 			elev_driver:set_motor_direction(Direction);
 
-		{open_door} ->
+		open_door ->
 			elev_driver:set_door_open_lamp(on);
 
-		{close_door} ->
+		close_door ->
 			elev_driver:set_door_open_lamp(off);
 
-		{set_button_lamp_on, Floor, Direction} ->
-			elev_driver:set_button_lamp(Floor, Direction, on);
-
-		{set_button_lamp_off, Floor, Direction} ->
-			elev_driver:set_button_lamp(Floor, Direction, off);
+		{set_button_lamp, Floor, Direction, State} ->
+			io:format("Setting light at ~p, ~p, ~p~n", [Floor, Direction, State]),
+			elev_driver:set_button_lamp(Floor, Direction, State);
 
 		_Message ->
 			io:format("Driverman received an abnormal message: ~p~n", [_Message]) %debug
@@ -61,7 +60,7 @@ elevator_manager() ->
 	receive {floor_reached, NewFloor} ->
 		driverman ! {set_motor, stop},
 		stateman ! {update_state, floor, NewFloor},
-		fsm ! {floor_reached}
+		fsm ! floor_reached
 	end,
 
 	receive {fsm, initialized} -> ok end,
@@ -74,50 +73,57 @@ elevator_manager_loop() ->
 			io:format("FLOOR ~p ---------------------- ~n", [NewFloor]),
 			stateman ! {update_state, floor, NewFloor},
 			stateman ! {get_target_floor, self()},
-			TargetFloor = receive F -> F end,
+			TargetFloor = receive {target_floor, F} -> F end,
+			io:format("Current target floor: ~p~n", [TargetFloor]),
 			stateman ! {get_direction, self()},
-			Direction = receive D -> D end,
+			Direction = receive {direction, D} -> D end,
+			%io:format("ready to match case ~n"),
+
+			localorderman ! {get_orders, self()},
+			receive {orders, LocalOrders} ->
+				io:format("Orders: ~p~n", [LocalOrders]),
+				LocalOrdersOnFloor = lists:filter(fun({_A,Floor,_D}) -> (Floor==NewFloor) end, LocalOrders)
+			end,
+
+			orderman ! {get_orders, self()},
+			receive {orders, GlobalOrders} ->
+				io:format("Orders: ~p~n", [GlobalOrders]),
+				GlobalOrdersOnFloor = lists:filter(fun({_A,Floor,_D}) -> (Floor==NewFloor) end, GlobalOrders)
+			end,
 
 			case NewFloor of
 				TargetFloor ->
-					fsm ! floor_reached,
 					io:format("~s~n", [color:red("TARGET FLOOR REACHED!")]),
-					driverman ! {set_motor, stop};
+
+					%driverman ! {set_button_lamp, TargetFloor, Direction, off},
+					driverman ! {set_motor, stop}, %redundant?
 					%clear_all_floors_at(NewFloor)
+					lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
+					lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersOnFloor),
+					io:format("Additionally, I remove these orders from target floor: ~p~n", [LocalOrdersOnFloor++GlobalOrdersOnFloor]),
+					fsm ! floor_reached;
+
 				_ ->
 					fsm ! floor_passed,
-					localorderman ! {get_orders, self()},
 
-					receive
-						{orders, LocalOrders} ->
-							io:format("Orders: ~p~n", [LocalOrders]),
-							LocalOrdersInSameDir = lists:filter(fun({_A,Floor,Dir}) -> (Dir==command) and (Floor==NewFloor) end, LocalOrders),
-							io:format("Adding: ~p~n", [LocalOrdersInSameDir])
-					end,
+					GlobalOrdersOnFloorInDirection = lists:filter(fun({_A,_F,Dir}) -> (Dir==Direction) end, GlobalOrdersOnFloor),
 
-					orderman ! {get_orders, self()},
-
-					receive
-						{orders, GlobalOrders} ->
-							io:format("Orders: ~p~n", [GlobalOrders]),
-							GlobalOrdersInSameDir = lists:filter(fun({_A,Floor,Dir}) -> (Dir==Direction) and (Floor==NewFloor) end, GlobalOrders),
-							io:format("Adding: ~p~n", [GlobalOrdersInSameDir])
-					end,
-
-					io:format("~s, ~p~n", [color:red("Orders I remove at this floor:"), LocalOrdersInSameDir++GlobalOrdersInSameDir]),
-					case LocalOrdersInSameDir++GlobalOrdersInSameDir of
+					io:format("~s, ~p~n", [color:red("Orders I remove at this floor:"), LocalOrdersOnFloor++GlobalOrdersOnFloorInDirection]),
+					case LocalOrdersOnFloor++GlobalOrdersOnFloorInDirection of
 						[] ->
 							io:format("No orders at this floor :-) ~n");
 						_StuffAtThisFloor ->
 							driverman ! {set_motor, stop},
-							driverman ! {set_button_lamp_off, NewFloor, Direction},
-							driverman ! {open_door},
-							timer:sleep(3000),
-							driverman ! {close_door},
-							lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersInSameDir),
-							lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersInSameDir),
+							%driverman ! {set_button_lamp, NewFloor, Direction, off},
+							driverman ! open_door,
+							timer:sleep(2000),
+							driverman ! close_door,
 							driverman ! {set_motor, Direction},
-							io:format("~s, ~p~n", [color:red("Finished: "), LocalOrdersInSameDir++GlobalOrdersInSameDir])
+							io:format("elevman removing~n"),
+							lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
+							lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersOnFloorInDirection),
+							io:format("DRIVING ON! <------ ~n"),
+							io:format("~s, ~p~n", [color:red("Finished: "), LocalOrdersOnFloor++GlobalOrdersOnFloorInDirection])
 						end
 			end;
 
@@ -126,31 +132,41 @@ elevator_manager_loop() ->
 			stateman ! {update_state, target_floor, -1},
 			% delay here to prevent multiple elevators attempting to invoke order distribution simultaneously
 			% possible problem: elevators calling distributor at the same time when multiple elevators are idle?
-
 			% this stuff below belongs in order_distributor
-			distributor ! get_floor,
-			%io:format("sent get_floor to distributor, awaiting response ~n"), %debug
+			distributor ! get_order,
+			%io:format("sent get_order to distributor, awaiting response ~n"), %debug
 
 			receive
 				{order, []} ->
-					io:format("~n");
-					%io:format("received empty list, no orders available OR no order for me ~n"); %debug
+					io:format("~n"),
+					io:format("received empty list, no orders available OR no order for me ~n"); %debug
 
-				{order, OrderFloor} ->
-					%io:format("received an order floor: ~p~n", [OrderFloor]),
+				{order, Order} ->
+					io:format("received an order floor: ~p~n", [Order]),
+					OrderFloor = Order#order.floor,
 					stateman ! {update_state, state, busy},
 					stateman ! {update_state, target_floor, OrderFloor},
 					% write OrderFloor to disk?
 					% then delete it from the orderlist in order_manager
-					stateman ! {get_state, self()},
-					CurrentFloor = receive {_Name, _State, Floor, _Direction, _Target} -> Floor end,
+					stateman ! {get_current_floor, self()},
+					CurrentFloor = receive {current_floor, Floor} -> Floor end,
 					if
 						CurrentFloor - OrderFloor == 0 ->
+							io:format("order is on my floor WHEN RECEIVED, deleting ~n"),
+							% TODO: also remove all command orders from this floor
+							case Order#order.direction of
+								command ->
+									order_manager:remove_order(localorderman, Order);
+								Direction ->
+									order_manager:remove_order(orderman, Order)
+							end,
 							fsm ! floor_reached;
 						CurrentFloor - OrderFloor < 0 ->
+							io:format("order received, telling FSM to start driving ASAP ~n"),
 							fsm ! {drive, up},
 							stateman ! {update_state, direction, up};
 						CurrentFloor - OrderFloor > 0 ->
+							io:format("order received, telling FSM to start driving ASAP ~n"),
 							fsm ! {drive, down},
 							stateman ! {update_state, direction, down}
 					end
@@ -160,9 +176,8 @@ elevator_manager_loop() ->
 	elevator_manager_loop().
 
 state_manager(NodeName, State, Floor, Direction, TargetFloor) ->
-	io:format("statemanager has been called ~n"), %debug
+	%io:format("statemanager has been called ~n"), %debug
 	%nameman ! {get_name, self()},
-
 		receive
 			{node_name, NewName} ->
 				state_manager(NewName, State, Floor, Direction, TargetFloor);
@@ -181,18 +196,18 @@ state_manager(NodeName, State, Floor, Direction, TargetFloor) ->
 				state_manager(NodeName, State, Floor, Direction, NewTargetFloor);
 
 			{get_state, Receiver} ->
-				Receiver ! {NodeName, State, Floor, Direction, TargetFloor},
+				Receiver ! {elevator_state, {NodeName, State, Floor, Direction, TargetFloor}},
 				state_manager(NodeName, State, Floor, Direction, TargetFloor);
 
 			{get_target_floor, Receiver} ->
-				Receiver ! TargetFloor,
+				Receiver ! {target_floor, TargetFloor},
 			state_manager(NodeName, State, Floor, Direction, TargetFloor);
 
 			{get_direction, Receiver} ->
-				Receiver ! Direction,
+				Receiver ! {direction, Direction},
 				state_manager(NodeName, State, Floor, Direction, TargetFloor);
 
-			{get_floor, Receiver} ->
-				Receiver ! Floor,
+			{get_current_floor, Receiver} ->
+				Receiver ! {current_floor, Floor},
 				state_manager(NodeName, State, Floor, Direction, TargetFloor)
 			end.

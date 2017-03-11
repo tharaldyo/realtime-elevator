@@ -9,75 +9,112 @@ start() ->
 distributor() ->
 
   receive
-    get_floor -> % main "gimme new order" call
-
-      % check if any orders are available, else send [] to the elevator making the request
+    get_order ->
       localorderman ! {get_orders, self()},
       receive
         {orders, []} ->
-          io:format("no local orders available, checking global orders ~n");
+          io:format("no local orders available, checking global orders ~n"),
+
+          orderman ! {get_orders, self()},
+          receive
+            {orders, []} ->
+              %io:format("no orders available, sending empty list ~n"),
+              elevatorman ! {order, []};
+
+            {orders, GlobalOrderList} -> % get first order in queue (FIFO)
+              [GlobalOrder|_Disregard] = GlobalOrderList,
+              io:format("order received: ~p~n", [GlobalOrder]), %debug
+              {Executor, Others} = get_best_elevator(GlobalOrder),
+              %io:format("The executor: ~p~n", [list_to_atom(element(1, Executor))]), %debug
+              %io:format("will receive this floor: ~p~n", [Order#order.floor]),
+
+              case Executor of
+                [] ->
+                  io:format("No executor found :-( ~n");
+                Executor ->
+                  case element(2, Executor) of
+                    idle ->
+                      {elevatorman, list_to_atom(element(1, Executor))} ! {order, GlobalOrder},
+                      io:format("order_distributor removing~n"),
+                      order_manager:remove_order(orderman, GlobalOrder);
+
+                    busy ->
+                      io:format("A driving elevator will complete the order: ~p~n", [Executor])
+                  end,
+
+                % send empty lists to all elevator who lost
+                  lists:foreach(fun(LosingElevator) ->
+                    {elevatorman, list_to_atom(element(1, LosingElevator))} ! {order, []}
+                    end, Others)
+              end
+          end;
 
         {orders, LocalOrderList} ->
           [LocalOrder|_D] = LocalOrderList,
           %io:format("local order received: ~p~n", [LocalOrder]), %debug
-          elevatorman ! {order, LocalOrder#order.floor},
+          elevatorman ! {order, LocalOrder},
+          io:format("order_distributor removing~n"),
           order_manager:remove_order(localorderman, LocalOrder)
 
-        end,
-
-      orderman ! {get_orders, self()},
-      receive
-        {orders, []} ->
-          %io:format("no orders available, sending empty list ~n"),
-          elevatorman ! {order, []};
-
-        {orders, GlobalOrderList} -> % get first order in queue (FIFO)
-          [GlobalOrder|_Disregard] = GlobalOrderList,
-          io:format("order received: ~p~n", [GlobalOrder]), %debug
-          Executor = find_best_elevator(GlobalOrder),
-          %io:format("The executor: ~p~n", [list_to_atom(element(1, Executor))]), %debug
-          %io:format("will receive this floor: ~p~n", [Order#order.floor]),
-          {elevatorman, list_to_atom(element(1, Executor))} ! {order, GlobalOrder#order.floor},
-          order_manager:remove_order(orderman, GlobalOrder)
-
-        end
-
-      % else, check states of elevators in Elevators
-      % compare the floors of the idle elevators to the one in the order
-      % assign the order by sending the floor number to the elevator who "wins"
-      % ^ how? if an elevator is idle, it has sent a request for order to its own distributor, will this cause problems?
-      % send something to the other elevators to let them know they "lost" (i.e. [])
-      % this should all happen in distributor, though, this function only finds best elevator and returns it
-      %send the order to Executor
-      %send "no order for you" to Elevators--Executor
+      end
   end,
   distributor().
 
-find_best_elevator(Order) ->
-  Elevators = get_all_elevators(),
+get_best_elevator(Order) ->
+  Elevators = get_all_elevators(Order),
   io:format("Elevators: ~p~n", [Elevators]), %debug
+  % TODO: there is a bug here which causes the pattern match below to fail
   CostList = lists:map(fun(Elevator) -> {abs(element(3, Elevator) - Order#order.floor), Elevator} end, Elevators),
-  [{_Cost, Executor} | _Disregard] = lists:keysort(1, CostList),
+  io:format("Costlist looks like: ~p~n", [CostList]),
+  case CostList of
+    [] ->
+      Executor = [],
+      io:format("tried to find best elevator, but no elevators are available at the moment ~n");
+
+    CostList ->
+      [{_Cost, Executor} | _Disregard] = lists:keysort(1, CostList)
+  end,
+
+  {Executor, Elevators--[Executor]}.
+
   % Executor = element(2, ExecutorTuple),
   % Order#order.floor
 
-  Executor. %debug: should return the winning elevator
-
-get_all_elevators() ->
+get_all_elevators(Order) ->
   % returns a list of all the elevators and their state: [elevator1, elevator2, ..]
   ListCreator = spawn(fun() -> elevator_list([]) end), % TODO: turn this into a map?
   lists:foreach(fun(Node) ->
     {stateman, Node} ! {get_state, self()},
-    receive Elevator ->
+    receive {elevator_state, Elevator} ->
       case element(2, Elevator) of
         idle ->
           ListCreator ! {add_elevator, Elevator};
+        busy -> % moving elevators  can also take an order, if..
+          if Order#order.direction == element(4, Elevator) -> % check if order direction equals elevator direction
+            case element(4, Elevator) of % check elevator direction
+              up ->
+                % check if order floor is between the elevator and its destination
+                case lists:member(Order#order.floor, lists:seq(element(3, Elevator), element(5, Elevator))) of
+                   true ->
+                    ListCreator ! {add_elevator, Elevator};
+                   false -> ok
+                end;
+
+              down ->
+                case lists:member(Order#order.floor, lists:seq(element(5, Elevator), element(3, Elevator))) of
+                   true ->
+                    ListCreator ! {add_elevator, Elevator};
+                   false -> ok
+                end
+            end;
+            true -> ok
+          end; %debug: ends the first if
 
         _ ->
-          io:format("elevator not idle: ~p~n", [Elevator])
-      end
+          io:format("elevator not idle or driving: ~p~n", [Elevator])
+      end %debug: ends the first case
     end
-  end, [node()|nodes()]), %debug use [node()|nodes()]
+  end, [node()|nodes()]), %debug: ends the foreach
 
     ListCreator ! return_list,
     %io:format("hello from I just asked for list ~n"), %debug

@@ -23,9 +23,9 @@ add_order(Floor, Direction) ->
 	end.
 
 remove_order(QueueName, Order) ->
-	io:format("remove_order(QueueName, Order)~n"),
+	io:format("remove_order(~p, ~p)~n", [QueueName, Order]),
 	{_,Floor,Direction} = Order,
-	io:format("Floor: ~p, Direction: ~p~n", [Floor, Direction]),
+	%io:format("Floor: ~p, Direction: ~p~n", [Floor, Direction]),
 	QueueName ! {remove_order, #order{floor = Floor, direction = Direction}}.
 
 get_orders(QueueName) ->
@@ -43,7 +43,7 @@ order_queue_init(FileName, QueueName) ->
 	register(QueueName, spawn(fun() -> order_queue(OrdersFromDisk, FileName) end)).
 
 order_queue(Orders, FileName) ->
-	io:format("Orderlist: ~p~n", [Orders]),
+	io:format("Orderlist of ~p: ~p~n", [FileName, Orders]),
 	receive
 		{add_order, NewOrder} ->
 			case sets:is_element(NewOrder, sets:from_list(Orders)) of
@@ -52,7 +52,9 @@ order_queue(Orders, FileName) ->
 					dets:insert(FileName, NewOrder),
 					dets:close(FileName),
           if FileName == global_order_table ->
-            broadcast_orders(Orders++[NewOrder])
+              broadcast_orders(Orders++[NewOrder]);
+            true->
+              io:format("~n")
           end,
           elev_driver:set_button_lamp(element(2, NewOrder),element(3, NewOrder), on),
 					order_queue(Orders ++ [NewOrder], FileName);
@@ -67,11 +69,12 @@ order_queue(Orders, FileName) ->
 			order_queue(Orders--[Order], FileName);
 
 		{get_orders, PID} ->
-			io:format("get_orders received ~n"),
+			%io:format("get_orders received ~n"),
 			PID ! {orders, Orders},
 			order_queue(Orders, FileName)
 		end.
 
 % this function should be used to remove
 broadcast_orders(Orders) ->
-	lists:foreach(fun(Item) -> io:format("Sending order over network!~n") end, Orders).
+  ok.
+%	lists:foreach(fun(Item) -> io:format("Sending order over network!~n") end, Orders).
