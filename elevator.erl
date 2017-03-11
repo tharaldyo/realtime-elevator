@@ -11,7 +11,7 @@ start() ->
 	register(stateman, spawn(?MODULE, state_manager, [placeholder, init, -1, down, {#order{floor = -1, direction = down}}])),
 	nameman ! {get_name, stateman},
 	register(distributor, spawn(fun order_distributor:start/0)),
-	register(watchdog, spawn(fun watchdog/0)),
+	%register(watchdog, spawn(fun watchdog/0)),
 	io:format("Elevator pid: ~p~n", [self()]).
 
 driver_manager() ->
@@ -74,8 +74,10 @@ elevator_manager_loop() ->
 			io:format("FLOOR ~p ---------------------- ~n", [NewFloor]),
 			stateman ! {update_state, floor, NewFloor},
 			stateman ! {get_current_order, self()},
-			CurrentOrder = receive {target_floor, O} -> O end,
+			CurrentOrder = receive {current_order, O} -> O end,
+			io:format("ELEVATOR MANAGER: Current order: ~p~n", [CurrentOrder]),
 			TargetFloor = CurrentOrder#order.floor,
+			io:format("ELEVATOR MANAGER: Target floor: ~p~n", [TargetFloor]),
 			io:format("Current target floor: ~p~n", [TargetFloor]),
 			stateman ! {get_direction, self()},
 			Direction = receive {direction, D} -> D end,
@@ -101,7 +103,7 @@ elevator_manager_loop() ->
 					%driverman ! {set_button_lamp, TargetFloor, Direction, off},
 					driverman ! {set_motor, stop}, %redundant?
 					%clear_all_floors_at(NewFloor)
-					watchdog ! {elevator, remove_order, CurrentOrder},
+					%watchdog ! {elevator, remove_order, CurrentOrder},
 					lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
 					lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersOnFloor),
 					io:format("Additionally, I remove these orders from target floor: ~p~n", [LocalOrdersOnFloor++GlobalOrdersOnFloor]),
@@ -134,7 +136,7 @@ elevator_manager_loop() ->
 		idle ->
 			io:format("elevatorman received idle message, updating state and asking for order ~n"),
 			stateman ! {update_state, state, idle},
-			%stateman ! {update_state, new_order, -1},
+			%stateman ! {update_state, order, -1}, % not -1
 			% delay here to prevent multiple elevators attempting to invoke order distribution simultaneously
 			% possible problem: elevators calling distributor at the same time when multiple elevators are idle?
 			% this stuff below belongs in order_distributor
@@ -147,10 +149,10 @@ elevator_manager_loop() ->
 					io:format("received empty list, no orders available OR no order for me ~n"); %debug
 
 				{order, Order} ->
-					io:format("received an order floor: ~p~n", [Order]),
+					io:format("received an order: ~p~n", [Order]),
 					OrderFloor = Order#order.floor,
 					stateman ! {update_state, state, busy},
-					stateman ! {update_state, new_order, Order},
+					stateman ! {update_state, order, Order},
 					% write OrderFloor to disk?
 					% then delete it from the orderlist in order_manager
 					stateman ! {get_current_floor, self()},
@@ -163,8 +165,8 @@ elevator_manager_loop() ->
 								command ->
 									order_manager:remove_order(localorderman, Order);
 								% TODO: write the local order to disk?
-								Direction ->
-									watchdog ! {elevator, add_order, Order},
+								_Direction ->
+									%watchdog ! {elevator, add_order, Order},
 									order_manager:remove_order(orderman, Order)
 							end,
 							fsm ! floor_reached;
@@ -181,41 +183,6 @@ elevator_manager_loop() ->
 			end
 		end,
 	elevator_manager_loop().
-
-watchdog() ->
-	io:format("watchdog initialized ~n"),
-	watchdog_loop([]).
-
-watchdog_loop(WatcherList) ->
-	io:format("WATCHDOG: this is the current WatcherList: ~p~n", [WatcherList]),
-
-	receive
-		{elevator, Action, Order} -> % Action is either add_order or remove_order
-			lists:foreach(fun(Node) -> {watchdog, Node} ! {network, Action, Order} end, nodes()),
-			watchdog_loop(WatcherList);
-
-		{network, add_order, Order} ->
-			PID = spawn(fun() -> watcher_process(Order) end),
-			watchdog_loop(WatcherList++{PID, Order});
-
-		{network, remove_order, Order} ->
-			Watcher = lists:keyfind(Order, 2, WatcherList),
-			WatcherPID = element(1, Watcher), % sort of redundant, can do this and send message in one line instead
-			WatcherPID ! completed,
-			watchdog_loop(WatcherList--[Watcher])
-
-	end.
-
-watcher_process(Order) ->
-	receive
-		completed ->
-			io:format("WATCHER: order completed normally, exiting ~n"),
-			ok
-	after
-		20000 -> % TODO: tweak this?
-			io:format("WATCHER: order took too long, adding it back to the queue! ~n"),
-			order_manager:add_order(Order#order.floor, Order#order.direction)
-	end. % TODO: should die here automatically, maybe check if it does?
 
 state_manager(NodeName, State, Floor, Direction, Order) ->
 	%io:format("statemanager has been called ~n"), %debug
@@ -234,7 +201,7 @@ state_manager(NodeName, State, Floor, Direction, Order) ->
 			{update_state, direction, NewDirection} ->
 				state_manager(NodeName, State, Floor, NewDirection, Order);
 
-			{update_state, new_order, NewOrder} ->
+			{update_state, order, NewOrder} ->
 				state_manager(NodeName, State, Floor, Direction, NewOrder);
 
 			{get_state, Receiver} ->
