@@ -38,8 +38,8 @@ state_driving() ->
     endpoint ->
       driverman ! {set_motor, stop},
       state_idle()
-
-    after 5000 ->
+      
+    after 10000 ->
       state_lost()
     end.
 
