@@ -101,7 +101,7 @@ elevator_manager_loop() ->
 					%driverman ! {set_button_lamp, TargetFloor, Direction, off},
 					driverman ! {set_motor, stop}, %redundant?
 					%clear_all_floors_at(NewFloor)
-					watchdog ! {elevator, remove_order, Order},
+					watchdog ! {elevator, remove_order, CurrentOrder},
 					lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
 					lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersOnFloor),
 					io:format("Additionally, I remove these orders from target floor: ~p~n", [LocalOrdersOnFloor++GlobalOrdersOnFloor]),
@@ -184,21 +184,38 @@ elevator_manager_loop() ->
 
 watchdog() ->
 	io:format("watchdog initialized ~n"),
-	watchdog_loop().
+	watchdog_loop([]).
 
-watchdog_loop() ->
+watchdog_loop(WatcherList) ->
+	io:format("WATCHDOG: this is the current WatcherList: ~p~n", [WatcherList]),
+
 	receive
 		{elevator, Action, Order} -> % Action is either add_order or remove_order
-			foreach(fun(Node) -> {watchdog, Node} ! {network, Action, Order} end, nodes());
-
+			lists:foreach(fun(Node) -> {watchdog, Node} ! {network, Action, Order} end, nodes()),
+			watchdog_loop(WatcherList);
 
 		{network, add_order, Order} ->
-		receive
-			{network, remove_order, Order} -> ok
-			after 20000 -> order_manager:add_order(Order#order.floor, Order#order.direction)
+			PID = spawn(fun() -> watcher_process(Order) end),
+			watchdog_loop(WatcherList++{PID, Order});
 
+		{network, remove_order, Order} ->
+			Watcher = lists:keyfind(Order, 2, WatcherList),
+			WatcherPID = element(1, Watcher), % sort of redundant, can do this and send message in one line instead
+			WatcherPID ! completed,
+			watchdog_loop(WatcherList--[Watcher])
 
-	watchdog_loop().
+	end.
+
+watcher_process(Order) ->
+	receive
+		completed ->
+			io:format("WATCHER: order completed normally, exiting ~n"),
+			ok
+	after
+		20000 -> % TODO: tweak this?
+			io:format("WATCHER: order took too long, adding it back to the queue! ~n"),
+			order_manager:add_order(Order#order.floor, Order#order.direction)
+	end. % TODO: should die here automatically, maybe check if it does?
 
 state_manager(NodeName, State, Floor, Direction, Order) ->
 	%io:format("statemanager has been called ~n"), %debug
