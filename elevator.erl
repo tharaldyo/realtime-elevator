@@ -169,7 +169,6 @@ elevator_manager_loop() ->
 		idle ->
 			io:format("ELEVATOR: elevatorman received idle message, updating state and asking for order ~n"),
 			stateman ! {update_state, state, idle},
-			stateman !
 			% delay here to prevent multiple elevators attempting to invoke order distribution simultaneously
 			% possible problem: elevators calling distributor at the same time when multiple elevators are idle?
 			distributor ! get_order,
@@ -177,6 +176,7 @@ elevator_manager_loop() ->
 
 			receive
 				{order, []} ->
+					flusher([]),
 					%io:format("~n"),
 					io:format("ELEVATOR: received empty list, no orders available OR no order for me ~n"), %debug
 					elevator_manager_loop();
@@ -216,6 +216,12 @@ elevator_manager_loop() ->
 
 		end,
 	elevator_manager_loop().
+
+flusher(ToFlush) ->
+	receive
+		ToFlush -> flusher(ToFlush)
+	after 0 -> ok
+	end.
 
 turn_all_lights_off(Floor) ->
 	case Floor of
