@@ -12,12 +12,25 @@ start() ->
 	order_queue_init(local_order_table, localorderman).
 
 add_order(Floor, Direction) ->
+  NewOrder = #order{floor = Floor, direction = Direction},
 	case Direction of
 		command ->
-			localorderman ! {add_order, #order{floor = Floor, direction = Direction}};
+      LocalOrders = get_orders(localorderman),
+      case sets:is_element(NewOrder, sets:from_list(LocalOrders)) of
+				false ->
+          localorderman ! {add_order, NewOrder};
+        true ->
+          ok
+      end;
 		_Other ->
-			orderman ! {add_order, #order{floor = Floor, direction = Direction}},
-      broadcast_orders()
+      GlobalOrders = get_orders(orderman),
+      case sets:is_element(NewOrder, sets:from_list(GlobalOrders)) of
+				false ->
+          orderman ! {add_order, NewOrder},
+          broadcast_orders();
+        true ->
+          ok
+      end
 	end.
 
 remove_order(QueueName, Order) ->
@@ -31,23 +44,24 @@ remove_order(QueueName, Order) ->
   end.
 
 get_orders(QueueName) ->
-	QueueName ! get_orders,
+	QueueName ! {get_orders, self()},
 	receive
-		Orders ->
+		{orders, Orders} ->
 			Orders
     after ?RECEIVE_BLOCK_TIME ->
-      io:format("~s Order manager waiting for orders in get_orders().~n", [color:red("RECEIVE TIMEOUT:")])
+      io:format("~s Order manager waiting for orders in get_orders().~n", [color:red("RECEIVE TIMEOUT:")]),
+      []
 	end.
 
 order_queue_init(FileName, QueueName) ->
-	io:format("ORDER MANAGER: Loading ~p order table.~n", [QueueName]),
+	io:format("ORDER MANAGER: Loading ~p order table.~n", [QueueName]), %debug
 	dets:open_file(FileName, [{type, bag}]),
 	OrdersFromDisk = dets:lookup(FileName, order),
 	dets:close(FileName),
 	register(QueueName, spawn(fun() -> order_queue(OrdersFromDisk, FileName) end)).
 
 order_queue(Orders, FileName) ->
-	io:format("ORDER MANAGER: Orderlist ~p changed: ~p~n", [FileName, Orders]),
+	io:format("ORDER MANAGER: Orderlist of ~p: ~p~n", [FileName, Orders]), %debug
 	receive
 		{add_order, NewOrder} ->
 			case sets:is_element(NewOrder, sets:from_list(Orders)) of
@@ -75,13 +89,7 @@ order_queue(Orders, FileName) ->
 
 broadcast_orders() ->
   io:format("broadcast broadcast!~n"),
-  orderman ! {get_orders, self()},
-  GlobalOrders =
-  receive
-    {orders, Orders} ->
-      Orders
-    after ?RECEIVE_BLOCK_TIME ->
-      io:format("~s Order manager didn't get orders to broadcast.~n", [color:red("RECEIVE TIMEOUT:")]) end,
+  GlobalOrders = get_orders(orderman),
 
   lists:foreach(fun(Node) ->
     lists:foreach(fun(Order) -> {orderman, Node} ! {add_order, Order} end, GlobalOrders)
