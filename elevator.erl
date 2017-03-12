@@ -15,7 +15,7 @@ start() ->
 	io:format("Elevator pid: ~p~n", [self()]).
 
 driver_manager() ->
-	elev_driver:start(driverman, elevator),
+	elev_driver:start(driverman, simulator), %simulator, set to elevator for normal
 	timer:sleep(1000), %debug: try to wait for elevatorman
 	elevatorman ! {driverman, initialized},
 	driver_manager_loop().
@@ -85,7 +85,8 @@ elevator_manager_loop() ->
 			Direction = receive {direction, D} -> D end,
 			%io:format("ready to match case ~n"),
 
-			localorderman ! {get_orders, self()},
+			localorderman
+			! {get_orders, self()},
 			receive {orders, LocalOrders} ->
 				io:format("Orders: ~p~n", [LocalOrders]),
 				LocalOrdersOnFloor = lists:filter(fun({_A,Floor,_D}) -> (Floor==NewFloor) end, LocalOrders)
