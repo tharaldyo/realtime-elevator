@@ -113,17 +113,19 @@ elevator_manager_loop() ->
 					%clear_all_floors_at(NewFloor)
 					watchdog ! {elevator, remove_order, CurrentOrder}, %what about orders it clears during travel? ref. below
 
-					driverman ! {set_cab_lamp, CurrentOrder#order.floor, off},
-					case CurrentOrder#order.floor of
+					driverman ! {set_cab_lamp, NewFloor, off},
+					case NewFloor of
 						0 ->
-							driverman ! {set_button_lamp, CurrentOrder#order.floor, CurrentOrder#order.direction, off},
-							lists:foreach(fun(Node) -> {Node, driverman} ! {set_button_lamp, CurrentOrder#order.floor, up, off} end, [node()|nodes()]);
+							driverman ! {set_button_lamp, NewFloor, CurrentOrder#order.direction, off},
+							lists:foreach(fun(Node) -> {driverman, Node} ! {set_button_lamp, NewFloor, up, off} end, [node()|nodes()]);
 						3 ->
-							driverman ! {set_button_lamp, CurrentOrder#order.floor, CurrentOrder#order.direction, off},
-							lists:foreach(fun(Node) -> {Node, driverman} ! {set_button_lamp, CurrentOrder#order.floor, down, off} end, [node()|nodes()]);
+							driverman ! {set_button_lamp, NewFloor, CurrentOrder#order.direction, off},
+							lists:foreach(fun(Node) -> {driverman, Node} ! {set_button_lamp, NewFloor, down, off} end, [node()|nodes()]);
 						_else -> % 1 or 2
-							driverman ! {set_button_lamp, CurrentOrder#order.floor, up, off},
-							lists:foreach(fun(Node) -> {Node, driverman} ! {set_button_lamp, CurrentOrder#order.floor, down, off} end, [node()|nodes()])
+							lists:foreach(fun(Node) ->
+								{driverman, Node} ! {set_button_lamp, NewFloor, down, off},
+								{driverman, Node} ! {set_button_lamp, NewFloor, up, off}
+							 end, [node()|nodes()])
 					end,
 
 					lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
@@ -191,13 +193,22 @@ elevator_manager_loop() ->
 					CurrentFloor = receive {current_floor, Floor} -> Floor end,
 					if
 						CurrentFloor - OrderFloor == 0 ->
+
+
+
 							io:format("order is on my floor WHEN RECEIVED, deleting ~n"),
 							% TODO: also remove all command orders from this floor
 							case Order#order.direction of
 								command ->
+									driverman ! {set_cab_lamp, CurrentFloor, off},
 									order_manager:remove_order(localorderman, Order);
 								% TODO: write the local order to disk?
 								_Direction ->
+									lists:foreach(fun(Node) ->
+										watchdog ! {elevator, remove_order, Order},
+										{driverman, Node} ! {set_button_lamp, CurrentFloor, down, off},
+										{driverman, Node} ! {set_button_lamp, CurrentFloor, up, off}
+									end, [node()|nodes()]),
 									order_manager:remove_order(orderman, Order)
 							end,
 							fsm ! floor_reached;
