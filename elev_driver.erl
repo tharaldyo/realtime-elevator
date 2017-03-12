@@ -7,6 +7,11 @@
 
 -define(POLL_PERIOD, 50).
 
+% This code has been
+% (c) Kjetil Kjeka
+%
+%
+
 %% Module API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

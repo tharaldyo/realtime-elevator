@@ -42,12 +42,17 @@ driver_manager_loop() ->
 		close_door ->
 			elev_driver:set_door_open_lamp(off);
 
+		%{set_button_lamp, Floor, Direction, State} when State == off ->
+		%	% need to distribute this command over network
+		%	elev_driver:set_button_lamp(Floor, Direction, State),
+		%	lists:foreach(fun(Node) ->  {Node, driverman} ! {set_button_lamp, Floor, Direction, State}    end, [Nodes()])
+
 		{set_button_lamp, Floor, Direction, State} ->
-			io:format("Setting light at ~p, ~p, ~p~n", [Floor, Direction, State]),
+			%io:format("Setting light at ~p, ~p, ~p~n", [Floor, Direction, State]),
 			elev_driver:set_button_lamp(Floor, Direction, State);
 
-		{set_cab_light, Floor, State} ->
-			io:format("I received the order to turn off the cab light.~n"),
+		{set_cab_lamp, Floor, State} ->
+			%io:format("I received the order to turn off the cab light.~n"),
 			elev_driver:set_button_lamp(Floor, command, State);
 
 		_Message ->
@@ -108,21 +113,17 @@ elevator_manager_loop() ->
 					%clear_all_floors_at(NewFloor)
 					watchdog ! {elevator, remove_order, CurrentOrder}, %what about orders it clears during travel? ref. below
 
-					% Logic: so there can't really be more than one local order for this floor.
-					% thus the tactic of iterating over them all is useless.
-					% Also: We might have to consider hall lamps for the floor 1 and 4 edge cases,
-					% and handle these individually... a little messy solution.
-					driverman ! {set_cab_light, CurrentOrder#order.floor, off},
+					driverman ! {set_cab_lamp, CurrentOrder#order.floor, off},
 					case CurrentOrder#order.floor of
 						0 ->
 							driverman ! {set_button_lamp, CurrentOrder#order.floor, CurrentOrder#order.direction, off},
-							driverman ! {set_button_lamp, CurrentOrder#order.floor, up, off};
+							lists:foreach(fun(Node) -> {Node, driverman} ! {set_button_lamp, CurrentOrder#order.floor, up, off} end, [node()|nodes()]);
 						3 ->
 							driverman ! {set_button_lamp, CurrentOrder#order.floor, CurrentOrder#order.direction, off},
-							driverman ! {set_button_lamp, CurrentOrder#order.floor, down, off};
+							lists:foreach(fun(Node) -> {Node, driverman} ! {set_button_lamp, CurrentOrder#order.floor, down, off} end, [node()|nodes()]);
 						_else -> % 1 or 2
 							driverman ! {set_button_lamp, CurrentOrder#order.floor, up, off},
-							driverman ! {set_button_lamp, CurrentOrder#order.floor, down, off}
+							lists:foreach(fun(Node) -> {Node, driverman} ! {set_button_lamp, CurrentOrder#order.floor, down, off} end, [node()|nodes()])
 					end,
 
 					lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
@@ -143,7 +144,7 @@ elevator_manager_loop() ->
 							driverman ! {set_motor, stop},
 							%driverman ! {set_button_lamp, NewFloor, Direction, off},
 							driverman ! open_door,
-							lists:foreach(fun(Order) -> driverman ! {set_cab_light, Order#order.floor, off} end, LocalOrdersOnFloor),
+							lists:foreach(fun(Order) -> driverman ! {set_cab_lamp, Order#order.floor, off} end, LocalOrdersOnFloor),
 							lists:foreach(fun(Order) -> io:format("driverman instructions ~p,~p~n", [Order#order.floor, Direction]) end, GlobalOrdersOnFloorInDirection),
 							lists:foreach(fun(Order) -> driverman ! {set_button_lamp, Order#order.floor,Direction,off} end, GlobalOrdersOnFloorInDirection),
 							timer:sleep(2000),
