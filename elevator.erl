@@ -85,7 +85,7 @@ elevator_manager_loop() ->
 			stateman ! {update_state, floor, NewFloor},
 			stateman ! {get_current_order, self()},
 			CurrentOrder = receive {current_order, O} -> O
-			after ?RECEIVE_BLOCK_TIME -> io:format("~s: elevatorman was waiting for current order~n", [color:red("TIMEOUT")] end,
+			after ?RECEIVE_BLOCK_TIME -> io:format("~s: elevatorman was waiting for current order~n", [color:red("TIMEOUT")]) end,
 			%stateman ! {get_target_floor, self()},
 			%TargetFloor = receive {target_floor, F} -> F end,
 			io:format("ELEVATOR MANAGER: Current order: ~p~n", [CurrentOrder]),
@@ -93,20 +93,26 @@ elevator_manager_loop() ->
 			io:format("ELEVATOR MANAGER: Target floor: ~p~n", [TargetFloor]),
 			stateman ! {get_direction, self()},
 			Direction = receive {direction, D} -> D
-			after ?RECEIVE_BLOCK_TIME -> io:format("~s: elevatorman was waiting for direction~n", [color:red("TIMEOUT")] end,
+			after ?RECEIVE_BLOCK_TIME -> io:format("~s: elevatorman was waiting for direction~n", [color:red("TIMEOUT")]) end,
 			%io:format("ready to match case ~n"),
 
 			localorderman ! {get_orders, self()},
 			receive {orders, LocalOrders} ->
 				%io:format("ELEVATOR: Orders: ~p~n", [LocalOrders]),
 				LocalOrdersOnFloor = lists:filter(fun({_A,Floor,_D}) -> (Floor==NewFloor) end, LocalOrders)
-			after ?RECEIVE_BLOCK_TIME -> io:format("~s: elevatorman was waiting for local orders~n", [color:red("TIMEOUT")] end,
+			after ?RECEIVE_BLOCK_TIME ->
+				io:format("~s: elevatorman was waiting for local orders~n", [color:red("TIMEOUT")]),
+			 	LocalOrdersOnFloor = []
+			end,
 
 			orderman ! {get_orders, self()},
 			receive {orders, GlobalOrders} ->
 				%io:format("ELEVATOR: Orders: ~p~n", [GlobalOrders]),
 				GlobalOrdersOnFloor = lists:filter(fun({_A,Floor,_D}) -> (Floor==NewFloor) end, GlobalOrders)
-			after ?RECEIVE_BLOCK_TIME -> io:format("~s: elevatorman was waiting for global orders~n", [color:red("TIMEOUT")] end,
+				after ?RECEIVE_BLOCK_TIME ->
+					io:format("~s: elevatorman was waiting for global orders~n", [color:red("TIMEOUT")]),
+				 	GlobalOrdersOnFloor = []
+				end,
 
 			case NewFloor of
 				TargetFloor ->
@@ -194,7 +200,8 @@ elevator_manager_loop() ->
 					% then delete it from the orderlist in order_manager
 					stateman ! {get_current_floor, self()},
 					CurrentFloor = receive {current_floor, Floor} -> Floor
-					after ?RECEIVE_BLOCK_TIME -> io:format("~s: elevatorman was waiting for current floor~n", [color:red("TIMEOUT")] end,
+					after ?RECEIVE_BLOCK_TIME -> io:format("~s: elevatorman was waiting for current floor~n", [color:red("TIMEOUT")]) end,
+
 					if
 						CurrentFloor - OrderFloor == 0 ->
 
@@ -224,7 +231,7 @@ elevator_manager_loop() ->
 							%stateman ! {update_state, direction, down}
 					end
 					%orderman ! {remove_order, MyOrder} % do this somewhere else
-			after ?RECEIVE_BLOCK_TIME -> io:format("~s: elevatorman was waiting for order from distributor~n", [color:red("TIMEOUT")] end,
+			after ?RECEIVE_BLOCK_TIME -> io:format("~s: elevatorman was waiting for order from distributor~n", [color:red("TIMEOUT")]) end
 
 		end,
 	elevator_manager_loop().
