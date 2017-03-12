@@ -119,7 +119,7 @@ get_all_elevators(Order) ->
         _ ->
           io:format("ORDER DISTRIBUTOR: elevator not idle or driving: ~p~n", [Elevator])
       end %debug: ends the first case
-    after 1000 ->
+    after 500 ->
       io:format("~sORDER DISTRIBUTOR: failed to get state from node: ~p, WILL DISCONNECT IT~n", [color:red("RECEIVE TIMEOUT:"),Node]),
       erlang:disconnect_node(Node)
     end

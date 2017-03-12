@@ -29,7 +29,7 @@ state_idle() ->
     {state, driving} ->
       state_driving()
 
-    after 1000 ->
+    after 1500 ->
       io:format("STATE MACHINE: state_idle just timed out, calling again =) ~n"),
       state_idle()
   end.
