@@ -212,12 +212,12 @@ elevator_manager_loop() ->
 							elevatorman ! {floor_reached, CurrentFloor};
 						CurrentFloor - OrderFloor < 0 ->
 							io:format("ELEVATOR: order received, telling FSM to start driving ASAP ~n"),
-							fsm ! {drive, up};
-							%stateman ! {update_state, direction, up};
+							stateman ! {update_state, direction, up},
+							fsm ! {drive, up},
 						CurrentFloor - OrderFloor > 0 ->
 							io:format("ELEVATOR: order received, telling FSM to start driving ASAP ~n"),
+							stateman ! {update_state, direction, down},
 							fsm ! {drive, down}
-							%stateman ! {update_state, direction, down}
 					end
 					%orderman ! {remove_order, MyOrder} % do this somewhere else
 			after ?RECEIVE_BLOCK_TIME -> io:format("~s: elevatorman was waiting for order from distributor~n", [color:red("TIMEOUT")]) end
