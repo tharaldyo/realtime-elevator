@@ -1,4 +1,5 @@
 -module(order_distributor).
+-include("constants.hrl").
 -export([start/0]).
 -record(order, {floor, direction}).
 
@@ -7,7 +8,6 @@ start() ->
   distributor().
 
 distributor() ->
-
   receive
     get_order ->
       localorderman ! {get_orders, self()},
@@ -47,6 +47,7 @@ distributor() ->
                     {elevatorman, list_to_atom(element(1, LosingElevator))} ! {order, []}
                     end, Others)
               end
+          after ?RECEIVE_BLOCK_TIME -> io:format("~s Order distributor waiting for GLOBAL orders.~n", [color:red("RECEIVE TIMEOUT:")])
           end;
 
         {orders, LocalOrderList} ->
@@ -55,7 +56,7 @@ distributor() ->
           elevatorman ! {order, LocalOrder},
           %io:format("order_distributor removing~n"),
           order_manager:remove_order(localorderman, LocalOrder)
-
+      after ?RECEIVE_BLOCK_TIME -> io:format("~s Order distributor waiting for LOCAL orders.~n", [color:red("RECEIVE TIMEOUT:")])
       end
   end,
   distributor().
@@ -118,7 +119,7 @@ get_all_elevators(Order) ->
         _ ->
           io:format("ORDER DISTRIBUTOR: elevator not idle or driving: ~p~n", [Elevator])
       end %debug: ends the first case
-      after 4000 -> io:format("ORDER DISTRIBUTOR: failed to get state from node: ~p~n", [Node]), ok
+      after 4000 -> io:format("~sORDER DISTRIBUTOR: failed to get state from node: ~p~n", [color:red("RECEIVE TIMEOUT:"),Node]), ok
     end
   end, [node()|nodes()]), %debug: ends the foreach
 
@@ -133,6 +134,7 @@ elevator_list(Elevators) ->
       elevator_list(Elevators++[Elevator]);
     return_list ->
       distributor ! Elevators
+    after ?RECEIVE_BLOCK_TIME -> io:format("~s Order distributor waiting to get elevator_list.~n", [color:red("RECEIVE TIMEOUT:")])
   end.
 
 %get_states() ->
