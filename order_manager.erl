@@ -99,6 +99,7 @@ broadcast_orders() ->
   end, nodes()).
 
 broadcast_orders(OrderList) ->
+  io:format("ORDER MANAGER: broadcasting orderlist: ~p~n", [OrderList]),
   lists:foreach(fun(Node) ->
     lists:foreach(fun(Order) -> {orderman, Node} ! {add_order, Order} end, OrderList)
   end, nodes()).
