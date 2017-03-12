@@ -1,6 +1,6 @@
 -module(state_machine).
 -export([start/0]).
-%-record(order, {floor, direction}). %debug
+-include("constants.hrl").
 
 start() ->
   state_initializing().
@@ -49,7 +49,7 @@ state_driving() ->
 
 state_doors_open() ->
   driverman ! open_door,
-  timer:sleep(2000),
+  timer:sleep(?DOOR_OPEN_TIME),
   driverman ! close_door,
   state_idle().
   %io:format("hello from doors_open ~n").

@@ -1,1 +1,2 @@
 -define(RECEIVE_BLOCK_TIME, 2000).
+-define(DOOR_OPEN_TIME, 2000).

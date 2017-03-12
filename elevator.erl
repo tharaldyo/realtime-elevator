@@ -43,12 +43,12 @@ driver_manager_loop() ->
 		close_door ->
 			elev_driver:set_door_open_lamp(off);
 
-		%{set_button_lamp, Floor, Direction, State} when State == off ->
+		%{set_hall_lamp, Floor, Direction, State} when State == off ->
 		%	% need to distribute this command over network
-		%	elev_driver:set_button_lamp(Floor, Direction, State),
-		%	lists:foreach(fun(Node) ->  {Node, driverman} ! {set_button_lamp, Floor, Direction, State}    end, [Nodes()])
+		%	elev_driver:set_hall_lamp(Floor, Direction, State),
+		%	lists:foreach(fun(Node) ->  {Node, driverman} ! {set_hall_lamp, Floor, Direction, State}    end, [Nodes()])
 
-		{set_button_lamp, Floor, Direction, State} ->
+		{set_hall_lamp, Floor, Direction, State} ->
 			%io:format("Setting light at ~p, ~p, ~p~n", [Floor, Direction, State]),
 			elev_driver:set_button_lamp(Floor, Direction, State);
 
@@ -119,7 +119,7 @@ elevator_manager_loop() ->
 			case NewFloor of
 				TargetFloor ->
 					io:format("~s~n", [color:red("TARGET FLOOR REACHED!")]),
-					%driverman ! {set_button_lamp, TargetFloor, Direction, off},
+					%driverman ! {set_hall_lamp, TargetFloor, Direction, off},
 					driverman ! {set_motor, stop}, %redundant?
 					%clear_all_floors_at(NewFloor)
 					case CurrentOrder#order.direction of
@@ -130,7 +130,7 @@ elevator_manager_loop() ->
 					% what about orders it clears during travel? ref. below
 					% ^ these orders should not be in the watchlist in the first place
 
-					driverman ! {set_cab_lamp, NewFloor, off},
+					%driverman ! {set_cab_lamp, NewFloor, off},
 					turn_all_lights_off(NewFloor),
 
 					lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
@@ -149,19 +149,23 @@ elevator_manager_loop() ->
 							io:format("ELEVATOR: No orders at this floor :-) ~n");
 						_StuffAtThisFloor ->
 							driverman ! {set_motor, stop},
-							%driverman ! {set_button_lamp, NewFloor, Direction, off},
+							%driverman ! {set_hall_lamp, NewFloor, Direction, off},
 							driverman ! open_door,
-							lists:foreach(fun(Order) -> driverman ! {set_cab_lamp, Order#order.floor, off} end, LocalOrdersOnFloor),
-							lists:foreach(fun(Order) -> io:format("driverman instructions ~p,~p~n", [Order#order.floor, Direction]) end, GlobalOrdersOnFloorInDirection),
-							lists:foreach(fun(Order) -> driverman ! {set_button_lamp, Order#order.floor,Direction,off} end, GlobalOrdersOnFloorInDirection),
-							timer:sleep(2000),
+							lists:foreach(fun(Order) ->
+								order_manager:remove_order(localorderman, Order),
+								driverman ! {set_cab_lamp, Order#order.floor, off}
+							end, LocalOrdersOnFloor),
+							%lists:foreach(fun(Order) -> io:format("driverman instructions ~p,~p~n", [Order#order.floor, Direction]) end, GlobalOrdersOnFloorInDirection), %debug
+							lists:foreach(fun(Order) ->
+								lists:foreach(fun(Node) ->
+									{driverman, Node} ! {set_hall_lamp, Order#order.floor, Direction, off}
+								end, [node()|nodes()]),
+								order_manager:remove_order(orderman, Order)
+							end, GlobalOrdersOnFloorInDirection),
+
+							timer:sleep(?DOOR_OPEN_TIME),
 							driverman ! close_door,
 							driverman ! {set_motor, Direction},
-							io:format("ELEVATOR: elevman removing~n"),
-
-							lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
-							lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersOnFloorInDirection),
-							%io:format("DRIVING ON! <------ ~n"),
 							io:format("~s, ~p~n", [color:red("Finished: "), LocalOrdersOnFloor++GlobalOrdersOnFloorInDirection])
 						end
 			end;
@@ -226,16 +230,16 @@ flusher(ToFlush) ->
 turn_all_lights_off(Floor) ->
 	case Floor of
 		0 ->
-			driverman ! {set_button_lamp, Floor, command, off},
-			lists:foreach(fun(Node) -> {driverman, Node} ! {set_button_lamp, Floor, up, off} end, [node()|nodes()]);
+			driverman ! {set_hall_lamp, Floor, command, off},
+			lists:foreach(fun(Node) -> {driverman, Node} ! {set_hall_lamp, Floor, up, off} end, [node()|nodes()]);
 		3 ->
-			driverman ! {set_button_lamp, Floor, command, off},
-			lists:foreach(fun(Node) -> {driverman, Node} ! {set_button_lamp, Floor, down, off} end, [node()|nodes()]);
+			driverman ! {set_hall_lamp, Floor, command, off},
+			lists:foreach(fun(Node) -> {driverman, Node} ! {set_hall_lamp, Floor, down, off} end, [node()|nodes()]);
 		_else -> % 1 or 2
-			driverman ! {set_button_lamp, Floor, command, off},
+			driverman ! {set_cab_lamp, Floor, off},
 			lists:foreach(fun(Node) ->
-				{driverman, Node} ! {set_button_lamp, Floor, down, off},
-				{driverman, Node} ! {set_button_lamp, Floor, up, off}
+				{driverman, Node} ! {set_hall_lamp, Floor, down, off},
+				{driverman, Node} ! {set_hall_lamp, Floor, up, off}
 			 end, [node()|nodes()])
 	end.
 
