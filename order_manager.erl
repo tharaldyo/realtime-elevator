@@ -77,12 +77,8 @@ order_queue(Orders, FileName) ->
 broadcast_orders() ->
   orderman ! {get_orders, self()},
   GlobalOrders =
-  receive
-    {orders, Orders} ->
-      Orders
-    after ?RECEIVE_BLOCK_TIME -> io:format("~s Order manager didn't get orders to broadcast.~n", [color:red("RECEIVE TIMEOUT:")])
-  end,
-
+  receive {orders, Orders} -> Orders
+  after ?RECEIVE_BLOCK_TIME -> io:format("~s Order manager didn't get orders to broadcast.~n", [color:red("RECEIVE TIMEOUT:")]) end,
 
   lists:foreach(fun(Node) ->
     lists:foreach(fun(Order) -> {orderman, Node} ! {add_order, Order} end, GlobalOrders)

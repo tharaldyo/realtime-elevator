@@ -53,9 +53,9 @@ distributor() ->
         {orders, LocalOrderList} ->
           [LocalOrder|_D] = LocalOrderList,
           %io:format("local order received: ~p~n", [LocalOrder]), %debug
-          elevatorman ! {order, LocalOrder},
+          elevatorman ! {order, LocalOrder}
           %io:format("order_distributor removing~n"),
-          order_manager:remove_order(localorderman, LocalOrder)
+          %order_manager:remove_order(localorderman, LocalOrder)
       after ?RECEIVE_BLOCK_TIME -> io:format("~s Order distributor waiting for LOCAL orders.~n", [color:red("RECEIVE TIMEOUT:")])
       end
   end,

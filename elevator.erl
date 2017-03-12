@@ -96,6 +96,7 @@ elevator_manager_loop() ->
 			after ?RECEIVE_BLOCK_TIME -> io:format("~s: elevatorman was waiting for direction~n", [color:red("TIMEOUT")]) end,
 			%io:format("ready to match case ~n"),
 
+			% Construct a list over cab orders at the new floor
 			localorderman ! {get_orders, self()},
 			receive {orders, LocalOrders} ->
 				%io:format("ELEVATOR: Orders: ~p~n", [LocalOrders]),
@@ -105,6 +106,7 @@ elevator_manager_loop() ->
 			 	LocalOrdersOnFloor = []
 			end,
 
+			% Construct a list over hall orders at the new floor
 			orderman ! {get_orders, self()},
 			receive {orders, GlobalOrders} ->
 				%io:format("ELEVATOR: Orders: ~p~n", [GlobalOrders]),
@@ -120,7 +122,13 @@ elevator_manager_loop() ->
 					%driverman ! {set_button_lamp, TargetFloor, Direction, off},
 					driverman ! {set_motor, stop}, %redundant?
 					%clear_all_floors_at(NewFloor)
-					watchdog ! {elevator, remove_order, CurrentOrder}, %what about orders it clears during travel? ref. below
+					case CurrentOrder#order.direction of
+						command -> ok;
+						_D -> watchdog ! {elevator, remove_order, CurrentOrder}
+					end,
+					%	watchdog ! {elevator, remove_order, CurrentOrder},
+					% what about orders it clears during travel? ref. below
+					% ^ these orders should not be in the watchlist in the first place
 
 					driverman ! {set_cab_lamp, NewFloor, off},
 					turn_all_lights_off(NewFloor),
@@ -161,6 +169,7 @@ elevator_manager_loop() ->
 		idle ->
 			io:format("ELEVATOR: elevatorman received idle message, updating state and asking for order ~n"),
 			stateman ! {update_state, state, idle},
+			stateman !
 			% delay here to prevent multiple elevators attempting to invoke order distribution simultaneously
 			% possible problem: elevators calling distributor at the same time when multiple elevators are idle?
 			distributor ! get_order,
@@ -169,7 +178,8 @@ elevator_manager_loop() ->
 			receive
 				{order, []} ->
 					%io:format("~n"),
-					io:format("ELEVATOR: received empty list, no orders available OR no order for me ~n"); %debug
+					io:format("ELEVATOR: received empty list, no orders available OR no order for me ~n"), %debug
+					elevator_manager_loop();
 
 				{order, Order} ->
 					io:format("ELEVATOR: received an order: ~p~n", [Order]),
@@ -190,7 +200,6 @@ elevator_manager_loop() ->
 
 					if
 						CurrentFloor - OrderFloor == 0 ->
-
 							io:format("ELEVATOR: order is on my current floor, sending floor_reached right away ~n"),
 							elevatorman ! {floor_reached, CurrentFloor};
 						CurrentFloor - OrderFloor < 0 ->
@@ -251,12 +260,11 @@ watchdog_loop(WatcherList) ->
 					io:format("WATCHDOG: Error: this order is not being watched: ~p~n", [Order]),
 					watchdog_loop(WatcherList);
 				Watcher ->
-					io:format("WATCHDOG: His watch has ended: ~p~n", [Watcher]),
-					WatcherPID = element(1, Watcher), % sort of redundant, can do this and send message in one line instead
+					io:format("WATCHDOG: this watcher is ending: ~p~n", [Watcher]),
+					WatcherPID = element(1, Watcher), % can do this and send message in one line instead
 					WatcherPID ! completed,
 					watchdog_loop(WatcherList--[Watcher])
 			end
-
 	end.
 
 watcher_process(Order) ->
