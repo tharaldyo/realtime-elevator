@@ -1,6 +1,7 @@
 -module(elevator).
 -export([start/0, state_manager/5]).
 -record(order, {floor, direction}).
+-include("macros.hrl").
 
 start() ->
 	order_manager:start(),
