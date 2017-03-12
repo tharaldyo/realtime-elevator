@@ -15,11 +15,11 @@ state_initializing() ->
   state_idle().
 
 state_idle() ->
-  io:format("~nelevator says: hello, I'm idle! ~n"),
+  io:format("~nSTATE MACHINE: elevator says: hello, I'm idle! ~n"),
   elevatorman ! idle,
   receive
     {drive, Direction} ->
-      io:format("I received a command to start driving, I will start driving now ~n"),
+      io:format("STATE MACHINE: I received a command to start driving, I will start driving now ~n"),
       driverman ! {set_motor, Direction},
       stateman ! {update_state, direction, Direction},
       state_driving();
@@ -27,12 +27,12 @@ state_idle() ->
       state_doors_open()
 
     after 1000 ->
-      io:format("state_idle just timed out, calling again =) ~n"),
+      io:format("STATE MACHINE: state_idle just timed out, calling again =) ~n"),
       state_idle()
   end.
 
 state_driving() ->
-  io:format("DRIVING ~n"),
+  io:format("STATE MACHINE: DRIVING ~n"),
   receive
     floor_reached ->
       driverman ! {set_motor, stop},
@@ -56,7 +56,7 @@ state_doors_open() ->
 
 state_lost() ->
   stateman ! {update_state, state, lost}, % TODO: decide whether to send this to elevatorman or stateman
-  io:format("~s,~n", [color:red("ELEVATOR IS LOST!")]),
+  io:format("~s,~n", [color:red("STATE MACHINE: ELEVATOR IS LOST!")]),
 
   receive
     floor_reached ->

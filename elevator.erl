@@ -12,7 +12,7 @@ start() ->
 	nameman ! {get_name, stateman},
 	register(distributor, spawn(fun order_distributor:start/0)),
 	register(watchdog, spawn(fun watchdog/0)),
-	io:format("Elevator pid: ~p~n", [self()]).
+	io:format("ELEVATOR: Elevator pid: ~p~n", [self()]).
 
 driver_manager() ->
 	elev_driver:start(driverman, elevator), % 'elevator' or 'simulator'
@@ -23,7 +23,7 @@ driver_manager() ->
 driver_manager_loop() ->
 	receive
 		{new_order, Floor, Direction} -> % TODO: do pattern matching for "command" somewhere
-			io:format("new_order: ~p~n", [Floor]),
+			io:format("ELEVATOR: new_order: ~p~n", [Floor]),
 		  order_manager:add_order(Floor, Direction);
 
 		{floor_reached, 0} -> % arbitrary?
@@ -56,7 +56,7 @@ driver_manager_loop() ->
 			elev_driver:set_button_lamp(Floor, command, State);
 
 		_Message ->
-			io:format("Driverman received an abnormal message: ~p~n", [_Message]) %debug
+			io:format("ELEVATOR: Driverman received an abnormal message: ~p~n", [_Message]) %debug
 		end,
 	driver_manager_loop().
 
@@ -64,7 +64,7 @@ elevator_manager() ->
 	% make sure fsm and state manager initialize correctly
 	receive {driverman, initialized} -> ok end,
 	receive {fsm, intializing} -> ok end,
-	io:format("~s~n", [color:green("Driverman and FSM initialized.")]), %debug
+	io:format("~s~n", [color:green("ELEVATOR: Driverman and FSM initialized.")]), %debug
 
 	driverman ! {set_motor, down},
 	receive {floor_reached, NewFloor} ->
@@ -74,7 +74,7 @@ elevator_manager() ->
 	end,
 
 	receive {fsm, initialized} -> ok end,
-	io:format("Elevator initialized, ready for action. ~n"), %debug
+	io:format("ELEVATOR: Elevator initialized, ready for action. ~n"), %debug
 	elevator_manager_loop().
 
 elevator_manager_loop() ->
@@ -95,13 +95,13 @@ elevator_manager_loop() ->
 
 			localorderman ! {get_orders, self()},
 			receive {orders, LocalOrders} ->
-				io:format("Orders: ~p~n", [LocalOrders]),
+				%io:format("ELEVATOR: Orders: ~p~n", [LocalOrders]),
 				LocalOrdersOnFloor = lists:filter(fun({_A,Floor,_D}) -> (Floor==NewFloor) end, LocalOrders)
 			end,
 
 			orderman ! {get_orders, self()},
 			receive {orders, GlobalOrders} ->
-				io:format("Orders: ~p~n", [GlobalOrders]),
+				%io:format("ELEVATOR: Orders: ~p~n", [GlobalOrders]),
 				GlobalOrdersOnFloor = lists:filter(fun({_A,Floor,_D}) -> (Floor==NewFloor) end, GlobalOrders)
 			end,
 
@@ -130,7 +130,7 @@ elevator_manager_loop() ->
 
 					lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
 					lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersOnFloor),
-					io:format("Additionally, I remove these orders from target floor: ~p~n", [LocalOrdersOnFloor++GlobalOrdersOnFloor]),
+					io:format("ELEVATOR: Additionally, I remove these orders from target floor: ~p~n", [LocalOrdersOnFloor++GlobalOrdersOnFloor]),
 					fsm ! floor_reached;
 
 				_ ->
@@ -141,7 +141,7 @@ elevator_manager_loop() ->
 					io:format("~s, ~p~n", [color:red("Orders I remove at this floor:"), LocalOrdersOnFloor++GlobalOrdersOnFloorInDirection]),
 					case LocalOrdersOnFloor++GlobalOrdersOnFloorInDirection of
 						[] ->
-							io:format("No orders at this floor :-) ~n");
+							io:format("ELEVATOR: No orders at this floor :-) ~n");
 						_StuffAtThisFloor ->
 							driverman ! {set_motor, stop},
 							%driverman ! {set_button_lamp, NewFloor, Direction, off},
@@ -152,7 +152,7 @@ elevator_manager_loop() ->
 							timer:sleep(2000),
 							driverman ! close_door,
 							driverman ! {set_motor, Direction},
-							io:format("elevman removing~n"),
+							io:format("ELEVATOR: elevman removing~n"),
 
 							lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
 							lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersOnFloorInDirection),
@@ -162,7 +162,7 @@ elevator_manager_loop() ->
 			end;
 
 		idle ->
-			io:format("elevatorman received idle message, updating state and asking for order ~n"),
+			io:format("ELEVATOR: elevatorman received idle message, updating state and asking for order ~n"),
 			stateman ! {update_state, state, idle},
 			%stateman ! {update_state, order, -1}, % not -1
 			% delay here to prevent multiple elevators attempting to invoke order distribution simultaneously
@@ -174,10 +174,10 @@ elevator_manager_loop() ->
 			receive
 				{order, []} ->
 					%io:format("~n"),
-					io:format("received empty list, no orders available OR no order for me ~n"); %debug
+					io:format("ELEVATOR: received empty list, no orders available OR no order for me ~n"); %debug
 
 				{order, Order} ->
-					io:format("received an order: ~p~n", [Order]),
+					io:format("ELEVATOR: received an order: ~p~n", [Order]),
 
 					case Order#order.direction of
 						command -> ok;
@@ -196,7 +196,7 @@ elevator_manager_loop() ->
 
 
 
-							io:format("order is on my floor WHEN RECEIVED, deleting ~n"),
+							io:format("ELEVATOR: order is on my floor WHEN RECEIVED, deleting ~n"),
 							% TODO: also remove all command orders from this floor
 							case Order#order.direction of
 								command ->
@@ -204,8 +204,8 @@ elevator_manager_loop() ->
 									order_manager:remove_order(localorderman, Order);
 								% TODO: write the local order to disk?
 								_Direction ->
+									watchdog ! {elevator, remove_order, Order},
 									lists:foreach(fun(Node) ->
-										watchdog ! {elevator, remove_order, Order},
 										{driverman, Node} ! {set_button_lamp, CurrentFloor, down, off},
 										{driverman, Node} ! {set_button_lamp, CurrentFloor, up, off}
 									end, [node()|nodes()]),
@@ -213,11 +213,11 @@ elevator_manager_loop() ->
 							end,
 							fsm ! floor_reached;
 						CurrentFloor - OrderFloor < 0 ->
-							io:format("order received, telling FSM to start driving ASAP ~n"),
+							io:format("ELEVATOR: order received, telling FSM to start driving ASAP ~n"),
 							fsm ! {drive, up};
 							%stateman ! {update_state, direction, up};
 						CurrentFloor - OrderFloor > 0 ->
-							io:format("order received, telling FSM to start driving ASAP ~n"),
+							io:format("ELEVATOR: order received, telling FSM to start driving ASAP ~n"),
 							fsm ! {drive, down}
 							%stateman ! {update_state, direction, down}
 					end
@@ -238,7 +238,7 @@ watchdog_loop(WatcherList) ->
 		{elevator, Action, Order} -> % Action is either add_order or remove_order
 			lists:foreach(fun(Node) ->
 				 {watchdog, Node} ! {network, Action, Order},
-				 io:format("WATCHDOG: Broadcasting order: ~p to node ~p~n", [Order, Node])
+				 io:format("WATCHDOG: Broadcasting action '~p' of order '~p' to node '~p'~n", [Action, Order, Node])
 			 end, [node()|nodes()]),
 			watchdog_loop(WatcherList);
 

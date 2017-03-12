@@ -3,7 +3,7 @@
 -record(order, {floor, direction}).
 
 start() ->
-  io:format("order_distributor started ~n"),
+  io:format("ORDER DISTRIBUTOR: order_distributor started ~n"),
   distributor().
 
 distributor() ->
@@ -30,7 +30,7 @@ distributor() ->
 
               case Executor of
                 [] ->
-                  io:format("No executor found :-( ~n");
+                  io:format("ORDER DISTRIBUTOR: No executor found :-( ~n");
                 Executor ->
                   case element(2, Executor) of
                     idle ->
@@ -39,7 +39,7 @@ distributor() ->
                       order_manager:remove_order(orderman, GlobalOrder);
 
                     busy ->
-                      io:format("A driving elevator will complete the order: ~p~n", [Executor])
+                      io:format("ORDER DISTRIBUTOR: A driving elevator will complete the order: ~p~n", [Executor])
                   end,
 
                 % send empty lists to all elevator who lost
@@ -62,10 +62,10 @@ distributor() ->
 
 get_best_elevator(Order) ->
   Elevators = get_all_elevators(Order),
-  io:format("Elevators: ~p~n", [Elevators]), %debug
+  io:format("ORDER DISTRIBUTOR: Elevators: ~p~n", [Elevators]), %debug
   % TODO: there is a bug here which causes the pattern match below to fail
   CostList = lists:map(fun(Elevator) -> {abs(element(3, Elevator) - Order#order.floor), Elevator} end, Elevators),
-  io:format("Costlist looks like: ~p~n", [CostList]),
+  io:format("ORDER DISTRIBUTOR: Costlist looks like: ~p~n", [CostList]),
   case CostList of
     [] ->
       Executor = [];
@@ -109,16 +109,16 @@ get_all_elevators(Order) ->
                      false -> ok
                   end;
                 true ->
-                  io:format("DISTRIBUTOR: elevator is done with its current order ~n"),
+                  io:format("ORDER DISTRIBUTOR: elevator is done with its current order ~n"),
                   ListCreator ! {add_elevator, Elevator}
               end;
             true -> ok
           end; %debug: ends the first if
 
         _ ->
-          io:format("elevator not idle or driving: ~p~n", [Elevator])
+          io:format("ORDER DISTRIBUTOR: elevator not idle or driving: ~p~n", [Elevator])
       end %debug: ends the first case
-      after 4000 -> io:format("DISTRIBUTOR: failed to get state from node: ~p~n", [Node]), ok
+      after 4000 -> io:format("ORDER DISTRIBUTOR: failed to get state from node: ~p~n", [Node]), ok
     end
   end, [node()|nodes()]), %debug: ends the foreach
 
