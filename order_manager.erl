@@ -23,7 +23,6 @@ add_order(Floor, Direction) ->
 remove_order(QueueName, Order) ->
 	io:format("ORDER MANAGER: remove_order(~p, ~p)~n", [QueueName, Order]),
 	{_,Floor,Direction} = Order,
-	%io:format("Floor: ~p, Direction: ~p~n", [Floor, Direction]),
 	QueueName ! {remove_order, #order{floor = Floor, direction = Direction}},
   case QueueName of
     orderman ->
@@ -36,7 +35,8 @@ get_orders(QueueName) ->
 	receive
 		Orders ->
 			Orders
-    after ?RECEIVE_BLOCK_TIME -> io:format("~s Order manager waiting for orders in get_orders().~n", [color:red("RECEIVE TIMEOUT:")])
+    after ?RECEIVE_BLOCK_TIME ->
+      io:format("~s Order manager waiting for orders in get_orders().~n", [color:red("RECEIVE TIMEOUT:")])
 	end.
 
 order_queue_init(FileName, QueueName) ->
@@ -73,17 +73,16 @@ order_queue(Orders, FileName) ->
 			order_queue(Orders, FileName)
 	end.
 
-% this function should be used to remove
 broadcast_orders() ->
   io:format("broadcast broadcast!~n"),
-  T1 = os:timestamp(),
   orderman ! {get_orders, self()},
   GlobalOrders =
-  receive {orders, Orders} -> Orders
-  after ?RECEIVE_BLOCK_TIME -> io:format("~s Order manager didn't get orders to broadcast.~n", [color:red("RECEIVE TIMEOUT:")]) end,
+  receive
+    {orders, Orders} ->
+      Orders
+    after ?RECEIVE_BLOCK_TIME ->
+      io:format("~s Order manager didn't get orders to broadcast.~n", [color:red("RECEIVE TIMEOUT:")]) end,
 
   lists:foreach(fun(Node) ->
     lists:foreach(fun(Order) -> {orderman, Node} ! {add_order, Order} end, GlobalOrders)
-  end, nodes()),
-  T2 = os:timestamp(),
-  io:format("TIMER: broadcast_orders(): ~p~n", [timer:now_diff(T2,T1)]).
+  end, nodes()).
