@@ -125,7 +125,9 @@ get_all_elevators(Order) ->
 
     ListCreator ! return_list,
     %io:format("hello from I just asked for list ~n"), %debug
-    Elevators = receive ElevatorList -> ElevatorList end,
+    Elevators = receive {elevator_list, ElevatorList} -> ElevatorList
+    after ?RECEIVE_BLOCK_TIME -> io:format("~s Order distributor waiting to get elevator_list.~n", [color:red("RECEIVE TIMEOUT:")]) end,
+    
     Elevators.
 
 elevator_list(Elevators) ->
@@ -133,7 +135,7 @@ elevator_list(Elevators) ->
     {add_elevator, Elevator} ->
       elevator_list(Elevators++[Elevator]);
     return_list ->
-      distributor ! Elevators
+      distributor ! {elevator_list, Elevators}
     after ?RECEIVE_BLOCK_TIME -> io:format("~s Order distributor waiting to get elevator_list.~n", [color:red("RECEIVE TIMEOUT:")])
   end.
 

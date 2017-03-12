@@ -75,6 +75,8 @@ order_queue(Orders, FileName) ->
 
 % this function should be used to remove
 broadcast_orders() ->
+  io:format("broadcast broadcast!~n"),
+  T1 = os:timestamp(),
   orderman ! {get_orders, self()},
   GlobalOrders =
   receive {orders, Orders} -> Orders
@@ -82,4 +84,6 @@ broadcast_orders() ->
 
   lists:foreach(fun(Node) ->
     lists:foreach(fun(Order) -> {orderman, Node} ! {add_order, Order} end, GlobalOrders)
-  end, nodes()).
+  end, nodes()),
+  T2 = os:timestamp(),
+  io:format("TIMER: broadcast_orders(): ~p~n", [timer:now_diff(T2,T1)]).
