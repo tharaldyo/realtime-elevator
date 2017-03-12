@@ -9,7 +9,9 @@
 
 start() ->
 	order_queue_init(global_order_table, orderman),
-	order_queue_init(local_order_table, localorderman).
+	order_queue_init(local_order_table, localorderman),
+  spawn(fun order_synchronizer/0).
+
 
 add_order(Floor, Direction) ->
   NewOrder = #order{floor = Floor, direction = Direction},
@@ -103,3 +105,7 @@ broadcast_orders(OrderList) ->
   lists:foreach(fun(Node) ->
     lists:foreach(fun(Order) -> {orderman, Node} ! {add_order, Order} end, OrderList)
   end, nodes()).
+
+order_synchronizer() ->
+  timer:sleep(5000),
+  broadcast_orders().
