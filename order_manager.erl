@@ -58,6 +58,9 @@ order_queue_init(FileName, QueueName) ->
 	dets:open_file(FileName, [{type, bag}]),
 	OrdersFromDisk = dets:lookup(FileName, order),
 	dets:close(FileName),
+  case QueueName of
+    orderman -> broadcast_orders(OrdersFromDisk);
+    localorderman -> ok end,
 	register(QueueName, spawn(fun() -> order_queue(OrdersFromDisk, FileName) end)).
 
 order_queue(Orders, FileName) ->
@@ -93,4 +96,9 @@ broadcast_orders() ->
 
   lists:foreach(fun(Node) ->
     lists:foreach(fun(Order) -> {orderman, Node} ! {add_order, Order} end, GlobalOrders)
+  end, nodes()).
+
+broadcast_orders(OrderList) ->
+  lists:foreach(fun(Node) ->
+    lists:foreach(fun(Order) -> {orderman, Node} ! {add_order, Order} end, OrderList)
   end, nodes()).
