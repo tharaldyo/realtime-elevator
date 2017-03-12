@@ -20,7 +20,7 @@ state_idle() ->
   receive
     {drive, Direction} ->
       io:format("STATE MACHINE: I received a command to start driving, I will start driving now ~n"),
-      driverman ! {set_motor, Direction},
+      %driverman ! {set_motor, Direction},
       %stateman ! {update_state, direction, Direction},
       state_driving();
     floor_reached ->
