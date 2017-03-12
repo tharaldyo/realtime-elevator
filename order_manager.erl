@@ -55,7 +55,7 @@ order_queue(Orders, FileName) ->
 					dets:open_file(FileName, [{type, bag}]),
 					dets:insert(FileName, NewOrder),
 					dets:close(FileName),
-          % review line below...
+          % TODO: review line below...
           elev_driver:set_button_lamp(element(2, NewOrder),element(3, NewOrder), on),
 					order_queue(Orders ++ [NewOrder], FileName);
 				true ->

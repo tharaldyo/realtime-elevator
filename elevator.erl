@@ -123,19 +123,7 @@ elevator_manager_loop() ->
 					watchdog ! {elevator, remove_order, CurrentOrder}, %what about orders it clears during travel? ref. below
 
 					driverman ! {set_cab_lamp, NewFloor, off},
-					case NewFloor of
-						0 ->
-							driverman ! {set_button_lamp, NewFloor, CurrentOrder#order.direction, off},
-							lists:foreach(fun(Node) -> {driverman, Node} ! {set_button_lamp, NewFloor, up, off} end, [node()|nodes()]);
-						3 ->
-							driverman ! {set_button_lamp, NewFloor, CurrentOrder#order.direction, off},
-							lists:foreach(fun(Node) -> {driverman, Node} ! {set_button_lamp, NewFloor, down, off} end, [node()|nodes()]);
-						_else -> % 1 or 2
-							lists:foreach(fun(Node) ->
-								{driverman, Node} ! {set_button_lamp, NewFloor, down, off},
-								{driverman, Node} ! {set_button_lamp, NewFloor, up, off}
-							 end, [node()|nodes()])
-					end,
+					turn_all_lights_off(NewFloor),
 
 					lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
 					lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersOnFloor),
@@ -173,10 +161,8 @@ elevator_manager_loop() ->
 		idle ->
 			io:format("ELEVATOR: elevatorman received idle message, updating state and asking for order ~n"),
 			stateman ! {update_state, state, idle},
-			%stateman ! {update_state, order, -1}, % not -1
 			% delay here to prevent multiple elevators attempting to invoke order distribution simultaneously
 			% possible problem: elevators calling distributor at the same time when multiple elevators are idle?
-			% this stuff below belongs in order_distributor
 			distributor ! get_order,
 			%io:format("sent get_order to distributor, awaiting response ~n"), %debug
 
@@ -205,22 +191,8 @@ elevator_manager_loop() ->
 					if
 						CurrentFloor - OrderFloor == 0 ->
 
-							io:format("ELEVATOR: order is on my floor WHEN RECEIVED, deleting ~n"),
-							% TODO: also remove all command orders from this floor
-							case Order#order.direction of
-								command ->
-									driverman ! {set_cab_lamp, CurrentFloor, off},
-									order_manager:remove_order(localorderman, Order);
-								% TODO: write the local order to disk?
-								_Direction ->
-									watchdog ! {elevator, remove_order, Order},
-									lists:foreach(fun(Node) ->
-										{driverman, Node} ! {set_button_lamp, CurrentFloor, down, off},
-										{driverman, Node} ! {set_button_lamp, CurrentFloor, up, off}
-									end, [node()|nodes()]),
-									order_manager:remove_order(orderman, Order)
-							end,
-							fsm ! floor_reached;
+							io:format("ELEVATOR: order is on my current floor, sending floor_reached right away ~n"),
+							elevatorman ! {floor_reached, CurrentFloor};
 						CurrentFloor - OrderFloor < 0 ->
 							io:format("ELEVATOR: order received, telling FSM to start driving ASAP ~n"),
 							fsm ! {drive, up};
@@ -235,6 +207,22 @@ elevator_manager_loop() ->
 
 		end,
 	elevator_manager_loop().
+
+turn_all_lights_off(Floor) ->
+	case Floor of
+		0 ->
+			driverman ! {set_button_lamp, Floor, command, off},
+			lists:foreach(fun(Node) -> {driverman, Node} ! {set_button_lamp, Floor, up, off} end, [node()|nodes()]);
+		3 ->
+			driverman ! {set_button_lamp, Floor, command, off},
+			lists:foreach(fun(Node) -> {driverman, Node} ! {set_button_lamp, Floor, down, off} end, [node()|nodes()]);
+		_else -> % 1 or 2
+			driverman ! {set_button_lamp, Floor, command, off},
+			lists:foreach(fun(Node) ->
+				{driverman, Node} ! {set_button_lamp, Floor, down, off},
+				{driverman, Node} ! {set_button_lamp, Floor, up, off}
+			 end, [node()|nodes()])
+	end.
 
 watchdog() ->
 	io:format("WATCHDOG: watchdog initialized ~n"),
