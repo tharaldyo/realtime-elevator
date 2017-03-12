@@ -90,31 +90,35 @@ get_all_elevators(Order) ->
         idle ->
           ListCreator ! {add_elevator, Elevator};
         busy -> % moving elevators  can also take an order, if..
-          if Order#order.direction == element(4, Elevator) -> % check if order direction equals elevator direction
-            case element(4, Elevator) of % check elevator direction
-              up ->
-                % check if order floor is between the elevator and its destination
-                % TODO: fix rare bug where the seq fails because direction is not correct?
-                case lists:member(Order#order.floor, lists:seq(element(3, Elevator), (element(5, Elevator))#order.floor)) of
-                   true ->
-                    ListCreator ! {add_elevator, Elevator};
-                   false -> ok
-                end;
+          if
+            Order#order.direction == element(4, Elevator) -> % check if order direction equals elevator direction
+              CurrentFloor = element(3, Elevator),
+              TargetFloor = (element(5, Elevator))#order.floor,
 
-              down ->
-                case lists:member(Order#order.floor, lists:seq((element(5, Elevator))#order.floor, element(3, Elevator))) of
-                   true ->
-                    ListCreator ! {add_elevator, Elevator};
-                   false -> ok
-                end
-            end;
+              if
+                CurrentFloor < TargetFloor ->
+                  case lists:member(Order#order.floor, lists:seq(CurrentFloor, TargetFloor)) of
+                     true ->
+                      ListCreator ! {add_elevator, Elevator};
+                     false -> ok
+                  end;
+                CurrentFloor > TargetFloor ->
+                  case lists:member(Order#order.floor, lists:seq(TargetFloor, CurrentFloor)) of
+                     true ->
+                      ListCreator ! {add_elevator, Elevator};
+                     false -> ok
+                  end;
+                true ->
+                  io:format("DISTRIBUTOR: elevator is done with its current order ~n"),
+                  ListCreator ! {add_elevator, Elevator}
+              end;
             true -> ok
           end; %debug: ends the first if
 
         _ ->
           io:format("elevator not idle or driving: ~p~n", [Elevator])
       end %debug: ends the first case
-      after 5000 -> io:format("DISTRIBUTOR: failed to get state from node: ~p~n", Node), ok
+      after 4000 -> io:format("DISTRIBUTOR: failed to get state from node: ~p~n", [Node]), ok
     end
   end, [node()|nodes()]), %debug: ends the foreach
 
