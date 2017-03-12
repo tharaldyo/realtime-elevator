@@ -18,13 +18,16 @@ state_idle() ->
   io:format("~nSTATE MACHINE: elevator says: hello, I'm idle! ~n"),
   elevatorman ! idle,
   receive
-    {drive, Direction} ->
+    {drive, _Direction} ->
       io:format("STATE MACHINE: I received a command to start driving, I will start driving now ~n"),
       %driverman ! {set_motor, Direction},
       %stateman ! {update_state, direction, Direction},
       state_driving();
     floor_reached ->
-      state_doors_open()
+      state_doors_open();
+
+    {state, driving} ->
+      state_driving()
 
     after 1000 ->
       io:format("STATE MACHINE: state_idle just timed out, calling again =) ~n"),
@@ -39,7 +42,9 @@ state_driving() ->
       driverman ! {set_motor, stop},
       state_doors_open();
     floor_passed ->
-      state_driving()
+      state_driving();
+    {state, idle} ->
+      state_idle()
 
     after 10000 ->
       state_lost()
@@ -64,5 +69,28 @@ state_lost() ->
       state_doors_open();
     floor_passed ->
       driverman ! {set_motor, stop},
-      state_idle()
-  end.
+      state_idle();
+    {state, idle} ->
+      state_idle();
+    {state, driving} ->
+      state_driving()
+  after 5000 ->
+    io:format("STATE MACHINE: Elevator has been lost, last effort to save it will be to change motor direction~n"),
+    stateman ! {get_current_floor, self()},
+    Floor = receive {current_floor, CurrentFloor} -> CurrentFloor
+    after ?RECEIVE_BLOCK_TIME ->
+      io:format("STATE MACHINE: tried to get out of state, could not get floor. Probably gonna crash now~n"),
+      1
+    end,
+
+    case Floor of
+      0 ->
+        Direction = up;
+      _OtherFloor ->
+        Direction = down
+    end,
+
+    %debug: please do not let this make it into production
+    driverman ! {set_motor, Direction}
+  end,
+  state_lost().

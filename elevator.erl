@@ -122,6 +122,7 @@ elevator_manager_loop() ->
 
 			case NewFloor of
 				TargetFloor ->
+					%fsm ! {state, driving},
 					fsm ! floor_reached,
 					%driverman ! {set_motor, stop}, %redundant?
 					io:format("~s~n", [color:red("TARGET FLOOR REACHED!")]),
@@ -142,6 +143,7 @@ elevator_manager_loop() ->
 					io:format("ELEVATOR: Additionally, I remove these orders from target floor: ~p~n", [LocalOrdersOnFloor++GlobalOrdersOnFloor]);
 
 				_OtherFloor ->
+					%fsm ! {state, driving},
 					fsm ! floor_passed,
 
 					GlobalOrdersOnFloorInDirection = lists:filter(fun({_A,_F,Dir}) -> (Dir==Direction) end, GlobalOrdersOnFloor),
@@ -212,14 +214,16 @@ elevator_manager_loop() ->
 							io:format("ELEVATOR: order is on my current floor, sending floor_reached right away ~n"),
 							elevatorman ! {floor_reached, CurrentFloor};
 						CurrentFloor < OrderFloor ->
-							io:format("ELEVATOR: order received, telling FSM to start driving ASAP ~n"),
+							io:format("ELEVATOR: order received, setting motor direction to UP ~n"),
 							stateman ! {update_state, direction, up},
 							driverman ! {set_motor, up},
+							%fsm ! {state, idle},
 							fsm ! {drive, up};
 						CurrentFloor > OrderFloor ->
-							io:format("ELEVATOR: order received, telling FSM to start driving ASAP ~n"),
+							io:format("ELEVATOR: order received, setting motor direction to DOWN ~n"),
 							stateman ! {update_state, direction, down},
 							driverman ! {set_motor, down},
+							%fsm ! {state, idle},
 							fsm ! {drive, down}
 					end
 					%orderman ! {remove_order, MyOrder} % do this somewhere else
@@ -254,7 +258,7 @@ watchdog() ->
 	io:format("WATCHDOG: watchdog initialized ~n"),
 	watchdog_loop([]).
 
-watchdog_loop(WatcherList) ->
+ watchdog_loop(WatcherList) ->
 	io:format("WATCHDOG: this is the current WatcherList: ~p~n", [WatcherList]),
 
 	receive
