@@ -31,6 +31,10 @@ driver_manager_loop() ->
 			elev_driver:set_motor_direction(stop),
 			elevatorman ! {floor_reached, 0};
 
+		{floor_reached, 3} ->
+			elev_driver:set_motor_direction(stop),
+			elevatorman ! {floor_reached, 3};
+
 		{floor_reached, Floor} ->
 			elevatorman ! {floor_reached, Floor};
 
