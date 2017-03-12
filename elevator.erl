@@ -213,7 +213,7 @@ elevator_manager_loop() ->
 						CurrentFloor - OrderFloor < 0 ->
 							io:format("ELEVATOR: order received, telling FSM to start driving ASAP ~n"),
 							stateman ! {update_state, direction, up},
-							fsm ! {drive, up},
+							fsm ! {drive, up};
 						CurrentFloor - OrderFloor > 0 ->
 							io:format("ELEVATOR: order received, telling FSM to start driving ASAP ~n"),
 							stateman ! {update_state, direction, down},

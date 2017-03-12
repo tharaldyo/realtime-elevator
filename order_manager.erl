@@ -108,4 +108,5 @@ broadcast_orders(OrderList) ->
 
 order_synchronizer() ->
   timer:sleep(5000),
-  broadcast_orders().
+  broadcast_orders(),
+  order_synchronizer().
