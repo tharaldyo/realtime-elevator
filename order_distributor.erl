@@ -119,15 +119,20 @@ get_all_elevators(Order) ->
         _ ->
           io:format("ORDER DISTRIBUTOR: elevator not idle or driving: ~p~n", [Elevator])
       end %debug: ends the first case
-      after 4000 -> io:format("~sORDER DISTRIBUTOR: failed to get state from node: ~p~n", [color:red("RECEIVE TIMEOUT:"),Node]), ok
+    after 1000 ->
+      io:format("~sORDER DISTRIBUTOR: failed to get state from node: ~p~n, WILL DISCONNECT IT", [color:red("RECEIVE TIMEOUT:"),Node]),
+      erlang:disconnect_node(Node)
     end
   end, [node()|nodes()]), %debug: ends the foreach
 
     ListCreator ! return_list,
     %io:format("hello from I just asked for list ~n"), %debug
     Elevators = receive {elevator_list, ElevatorList} -> ElevatorList
-    after ?RECEIVE_BLOCK_TIME -> io:format("~s Order distributor waiting to get elevator_list.~n", [color:red("RECEIVE TIMEOUT:")]) end,
-    
+    after ?RECEIVE_BLOCK_TIME ->
+      io:format("~s Order distributor waiting to get elevator_list.~n", [color:red("RECEIVE TIMEOUT:")]),
+      []
+    end,
+
     Elevators.
 
 elevator_list(Elevators) ->
