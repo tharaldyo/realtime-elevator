@@ -35,21 +35,21 @@ state_driving() ->
   io:format("STATE MACHINE: driving ~n"),
   receive
     floor_reached ->
+      io:format("STATE MACHINE: received floor_reached, stopping, opening doors~n"),
       driverman ! {set_motor, stop},
       state_doors_open();
     floor_passed ->
-      state_driving();
-    endpoint ->
-      driverman ! {set_motor, stop},
-      state_idle()
+      state_driving()
 
     after 10000 ->
       state_lost()
     end.
 
 state_doors_open() ->
+  io:format("STATE MACHINE: opening doors~n"),
   driverman ! open_door,
   timer:sleep(?DOOR_OPEN_TIME),
+  io:format("STATE MACHINE: closing doors~n"),
   driverman ! close_door,
   state_idle().
   %io:format("hello from doors_open ~n").
