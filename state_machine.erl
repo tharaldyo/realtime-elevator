@@ -60,9 +60,9 @@ state_lost() ->
 
   receive
     floor_reached ->
-      elevatorman ! {set_motor, stop},
+      driverman ! {set_motor, stop},
       state_doors_open();
     floor_passed ->
-      elevatorman ! {set_motor, stop},
+      driverman ! {set_motor, stop},
       state_idle()
   end.

@@ -176,7 +176,7 @@ elevator_manager_loop() ->
 
 			receive
 				{order, []} ->
-					flusher([]),
+					flusher({order, []}),
 					%io:format("~n"),
 					io:format("ELEVATOR: received empty list, no orders available OR no order for me ~n"), %debug
 					elevator_manager_loop();
