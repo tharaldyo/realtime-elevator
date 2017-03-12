@@ -1,5 +1,7 @@
 -module(order_manager).
 -record(order, {floor, direction}).
+-include("constants.hrl").
+
 -export([	start/0,
  					add_order/2,
 					remove_order/2,
@@ -34,6 +36,7 @@ get_orders(QueueName) ->
 	receive
 		Orders ->
 			Orders
+    after ?RECEIVE_BLOCK_TIME -> io:format("~s Order manager waiting for orders in get_orders().~n", [color:red("RECEIVE TIMEOUT:")])
 	end.
 
 order_queue_init(FileName, QueueName) ->
@@ -68,12 +71,18 @@ order_queue(Orders, FileName) ->
 		{get_orders, PID} ->
 			PID ! {orders, Orders},
 			order_queue(Orders, FileName)
-		end.
+	end.
 
 % this function should be used to remove
 broadcast_orders() ->
   orderman ! {get_orders, self()},
-  GlobalOrders = receive {orders, Orders} -> Orders end,
+  GlobalOrders =
+  receive
+    {orders, Orders} ->
+      Orders
+    after ?RECEIVE_BLOCK_TIME -> io:format("~s Order manager didn't get orders to broadcast.~n", [color:red("RECEIVE TIMEOUT:")])
+  end,
+
 
   lists:foreach(fun(Node) ->
     lists:foreach(fun(Order) -> {orderman, Node} ! {add_order, Order} end, GlobalOrders)
