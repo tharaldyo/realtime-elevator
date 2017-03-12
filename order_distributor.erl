@@ -114,6 +114,7 @@ get_all_elevators(Order) ->
         _ ->
           io:format("elevator not idle or driving: ~p~n", [Elevator])
       end %debug: ends the first case
+      after 5000 -> io:format("DISTRIBUTOR: failed to get state from node: ~p~n", Node), ok
     end
   end, [node()|nodes()]), %debug: ends the foreach
 

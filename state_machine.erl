@@ -50,7 +50,7 @@ state_driving() ->
 state_doors_open() ->
   driverman ! open_door,
   timer:sleep(2000),
-  elevatorman ! close_door,
+  driverman ! close_door,
   state_idle().
   %io:format("hello from doors_open ~n").
 

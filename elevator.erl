@@ -15,7 +15,7 @@ start() ->
 	io:format("Elevator pid: ~p~n", [self()]).
 
 driver_manager() ->
-	elev_driver:start(driverman, simulator), %simulator, set to elevator for normal
+	elev_driver:start(driverman, elevator), % 'elevator' or 'simulator'
 	timer:sleep(1000), %debug: try to wait for elevatorman
 	elevatorman ! {driverman, initialized},
 	driver_manager_loop().
@@ -45,6 +45,10 @@ driver_manager_loop() ->
 		{set_button_lamp, Floor, Direction, State} ->
 			io:format("Setting light at ~p, ~p, ~p~n", [Floor, Direction, State]),
 			elev_driver:set_button_lamp(Floor, Direction, State);
+
+		{set_cab_light, Floor, State} ->
+			io:format("I received the order to turn off the cab light.~n"),
+			elev_driver:set_button_lamp(Floor, command, State);
 
 		_Message ->
 			io:format("Driverman received an abnormal message: ~p~n", [_Message]) %debug
@@ -80,13 +84,11 @@ elevator_manager_loop() ->
 			io:format("ELEVATOR MANAGER: Current order: ~p~n", [CurrentOrder]),
 			TargetFloor = CurrentOrder#order.floor,
 			io:format("ELEVATOR MANAGER: Target floor: ~p~n", [TargetFloor]),
-			io:format("Current target floor: ~p~n", [TargetFloor]),
 			stateman ! {get_direction, self()},
 			Direction = receive {direction, D} -> D end,
 			%io:format("ready to match case ~n"),
 
-			localorderman
-			! {get_orders, self()},
+			localorderman ! {get_orders, self()},
 			receive {orders, LocalOrders} ->
 				io:format("Orders: ~p~n", [LocalOrders]),
 				LocalOrdersOnFloor = lists:filter(fun({_A,Floor,_D}) -> (Floor==NewFloor) end, LocalOrders)
@@ -101,12 +103,26 @@ elevator_manager_loop() ->
 			case NewFloor of
 				TargetFloor ->
 					io:format("~s~n", [color:red("TARGET FLOOR REACHED!")]),
-
-
 					%driverman ! {set_button_lamp, TargetFloor, Direction, off},
 					driverman ! {set_motor, stop}, %redundant?
 					%clear_all_floors_at(NewFloor)
-					watchdog ! {elevator, remove_order, CurrentOrder},
+					watchdog ! {elevator, remove_order, CurrentOrder}, %what about orders it clears during travel? ref. below
+
+					% Logic: so there can't really be more than one local order for this floor.
+					% thus the tactic of iterating over them all is useless.
+					% Also: We might have to consider hall lamps for the floor 1 and 4 edge cases,
+					% and handle these individually... a little messy solution.
+					driverman ! {set_cab_light, CurrentOrder#order.floor, off},
+					case CurrentOrder#order.floor of
+						0 ->
+							driverman ! {set_button_lamp, CurrentOrder#order.floor, CurrentOrder#order.direction, off};
+						3 ->
+							driverman ! {set_button_lamp, CurrentOrder#order.floor, CurrentOrder#order.direction, off};
+						_else -> % 1 or 2
+							driverman ! {set_button_lamp, CurrentOrder#order.floor, up, off},
+							driverman ! {set_button_lamp, CurrentOrder#order.floor, down, off}
+					end,
+
 					lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
 					lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersOnFloor),
 					io:format("Additionally, I remove these orders from target floor: ~p~n", [LocalOrdersOnFloor++GlobalOrdersOnFloor]),
@@ -125,10 +141,14 @@ elevator_manager_loop() ->
 							driverman ! {set_motor, stop},
 							%driverman ! {set_button_lamp, NewFloor, Direction, off},
 							driverman ! open_door,
+							lists:foreach(fun(Order) -> driverman ! {set_cab_light, Order#order.floor, off} end, LocalOrdersOnFloor),
+							lists:foreach(fun(Order) -> io:format("driverman instructions ~p,~p~n", [Order#order.floor, Direction]) end, GlobalOrdersOnFloorInDirection),
+							lists:foreach(fun(Order) -> driverman ! {set_button_lamp, Order#order.floor,Direction,off} end, GlobalOrdersOnFloorInDirection),
 							timer:sleep(2000),
 							driverman ! close_door,
 							driverman ! {set_motor, Direction},
 							io:format("elevman removing~n"),
+
 							lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
 							lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersOnFloorInDirection),
 							%io:format("DRIVING ON! <------ ~n"),
@@ -236,8 +256,9 @@ watcher_process(Order) ->
 	after
 		20000 -> % TODO: tweak this?
 			io:format("WATCHER: order took too long, adding it back to the queue! ~n"),
-			watchdog ! {elevator, remove_order, Order},
-			order_manager:add_order(Order#order.floor, Order#order.direction)
+			order_manager:add_order(Order#order.floor, Order#order.direction),
+			watchdog ! {elevator, remove_order, Order}
+
 	end. % TODO: should die here automatically, maybe check if it does?
 
 state_manager(NodeName, State, Floor, Direction, Order) ->
