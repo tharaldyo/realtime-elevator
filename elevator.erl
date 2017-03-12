@@ -115,9 +115,11 @@ elevator_manager_loop() ->
 					driverman ! {set_cab_light, CurrentOrder#order.floor, off},
 					case CurrentOrder#order.floor of
 						0 ->
-							driverman ! {set_button_lamp, CurrentOrder#order.floor, CurrentOrder#order.direction, off};
+							driverman ! {set_button_lamp, CurrentOrder#order.floor, CurrentOrder#order.direction, off},
+							driverman ! {set_button_lamp, CurrentOrder#order.floor, up, off};
 						3 ->
-							driverman ! {set_button_lamp, CurrentOrder#order.floor, CurrentOrder#order.direction, off};
+							driverman ! {set_button_lamp, CurrentOrder#order.floor, CurrentOrder#order.direction, off},
+							driverman ! {set_button_lamp, CurrentOrder#order.floor, down, off};
 						_else -> % 1 or 2
 							driverman ! {set_button_lamp, CurrentOrder#order.floor, up, off},
 							driverman ! {set_button_lamp, CurrentOrder#order.floor, down, off}
