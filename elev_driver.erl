@@ -1,3 +1,4 @@
+% (C) Kjetil Kjeka
 -module(elev_driver).
 -export([start/2, stop/0]).
 -export([init/1, set_motor_direction/1, set_door_open_lamp/1, set_stop_lamp/1, set_floor_indicator/1, set_button_lamp/3, foreach_button/1]).
@@ -7,10 +8,7 @@
 
 -define(POLL_PERIOD, 50).
 
-% This code has been
-% (c) Kjetil Kjeka
-%
-%
+
 
 %% Module API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

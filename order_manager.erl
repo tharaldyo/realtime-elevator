@@ -12,7 +12,6 @@ start() ->
 	order_queue_init(local_order_table, localorderman),
   spawn(fun order_synchronizer/0).
 
-
 add_order(Floor, Direction) ->
   NewOrder = #order{floor = Floor, direction = Direction},
 	case Direction of
@@ -51,12 +50,10 @@ get_orders(QueueName) ->
 		{orders, Orders} ->
 			Orders
     after ?RECEIVE_BLOCK_TIME ->
-      io:format("~s Order manager waiting for orders in get_orders().~n", [color:red("RECEIVE TIMEOUT:")]),
       []
 	end.
 
 order_queue_init(FileName, QueueName) ->
-	io:format("ORDER MANAGER: Loading ~p order table.~n", [QueueName]), %debug
 	dets:open_file(FileName, [{type, bag}]),
 	OrdersFromDisk = dets:lookup(FileName, order),
 	dets:close(FileName),
@@ -66,7 +63,6 @@ order_queue_init(FileName, QueueName) ->
 	register(QueueName, spawn(fun() -> order_queue(OrdersFromDisk, FileName) end)).
 
 order_queue(Orders, FileName) ->
-	io:format("ORDER MANAGER: Orderlist of ~p: ~p~n", [FileName, Orders]), %debug
 	receive
 		{add_order, NewOrder} ->
 			case sets:is_element(NewOrder, sets:from_list(Orders)) of
@@ -74,8 +70,7 @@ order_queue(Orders, FileName) ->
 					dets:open_file(FileName, [{type, bag}]),
 					dets:insert(FileName, NewOrder),
 					dets:close(FileName),
-          % TODO: review line below...
-          elev_driver:set_button_lamp(element(2, NewOrder),element(3, NewOrder), on),
+          driverman ! {set_hall_lamp, element(2, NewOrder), element(3, NewOrder), on),
 					order_queue(Orders ++ [NewOrder], FileName);
 				true ->
 					order_queue(Orders, FileName)
@@ -93,7 +88,6 @@ order_queue(Orders, FileName) ->
 	end.
 
 broadcast_orders() ->
-  io:format("broadcast broadcast!~n"),
   GlobalOrders = get_orders(orderman),
 
   lists:foreach(fun(Node) ->
@@ -101,7 +95,6 @@ broadcast_orders() ->
   end, nodes()).
 
 broadcast_orders(OrderList) ->
-  io:format("ORDER MANAGER: broadcasting orderlist: ~p~n", [OrderList]),
   lists:foreach(fun(Node) ->
     lists:foreach(fun(Order) -> {orderman, Node} ! {add_order, Order} end, OrderList)
   end, nodes()).
