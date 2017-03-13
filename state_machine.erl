@@ -74,23 +74,23 @@ state_lost() ->
       state_idle();
     {state, driving} ->
       state_driving()
-  after 5000 ->
-    io:format("STATE MACHINE: Elevator has been lost, last effort to save it will be to change motor direction~n"),
-    stateman ! {get_current_floor, self()},
-    Floor = receive {current_floor, CurrentFloor} -> CurrentFloor
-    after ?RECEIVE_BLOCK_TIME ->
-      io:format("STATE MACHINE: tried to get out of state, could not get floor. Probably gonna crash now~n"),
-      1
-    end,
-
-    case Floor of
-      0 ->
-        Direction = up;
-      _OtherFloor ->
-        Direction = down
-    end,
-
-    %debug: please do not let this make it into production
-    driverman ! {set_motor, Direction}
+  % after 5000 ->
+  %   io:format("STATE MACHINE: Elevator has been lost, last effort to save it will be to change motor direction~n"),
+  %   stateman ! {get_current_floor, self()},
+  %   Floor = receive {current_floor, CurrentFloor} -> CurrentFloor
+  %   after ?RECEIVE_BLOCK_TIME ->
+  %     io:format("STATE MACHINE: tried to get out of state, could not get floor. Probably gonna crash now~n"),
+  %     1
+  %   end,
+  %
+  %   case Floor of
+  %     0 ->
+  %       Direction = up;
+  %     _OtherFloor ->
+  %       Direction = down
+  %   end,
+  %
+  %   %debug: please do not let this make it into production
+  %   driverman ! {set_motor, Direction}
   end,
   state_lost().
