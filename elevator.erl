@@ -17,7 +17,7 @@ start() ->
 	register(watchdog, spawn(fun watchdog/0)).
 
 driver_manager() ->
-	elev_driver:start(driverman, elevator), % 'elevator' or 'simulator'
+	elev_driver:start(driverman, elevator),
 	timer:sleep(1000),
 	elevatorman ! {driverman, initialized},
 	driver_manager_loop().
@@ -51,14 +51,12 @@ driver_manager_loop() ->
 			elev_driver:set_button_lamp(Floor, Direction, State);
 
 		{set_cab_lamp, Floor, State} ->
-			elev_driver:set_button_lamp(Floor, command, State);
+			elev_driver:set_button_lamp(Floor, command, State)
 
-		_Message ->
-			io:format("Driver manager received an abnormal message: ~p~n", [_Message]) %debug
 		end,
 	driver_manager_loop().
 
-% initialization routine
+% Initialization routine
 elevator_manager() ->
 	receive {driverman, initialized} -> ok end,
 	receive {fsm, intializing} -> ok end,
@@ -95,7 +93,7 @@ elevator_manager_loop() ->
 			 	LocalOrdersOnFloor = []
 			end,
 
-			% Construct a list over hall orders at the new floor
+			% Construct a list of hall orders at the new floor
 			orderman ! {get_orders, self()},
 			receive {orders, GlobalOrders} ->
 				GlobalOrdersOnFloor = lists:filter(fun({_A,Floor,_D}) -> (Floor==NewFloor) end, GlobalOrders)
@@ -198,7 +196,7 @@ turn_all_lights_off(Floor) ->
 		3 ->
 			driverman ! {set_hall_lamp, Floor, command, off},
 			lists:foreach(fun(Node) -> {driverman, Node} ! {set_hall_lamp, Floor, down, off} end, [node()|nodes()]);
-		_else -> % 1 or 2
+		_else ->
 			driverman ! {set_cab_lamp, Floor, off},
 			lists:foreach(fun(Node) ->
 				{driverman, Node} ! {set_hall_lamp, Floor, down, off},
@@ -211,7 +209,7 @@ watchdog() ->
 
  watchdog_loop(WatcherList) ->
 	receive
-		{elevator, Action, Order} -> % Action is either add_order or remove_order
+		{elevator, Action, Order} ->
 			lists:foreach(fun(Node) ->
 				 {watchdog, Node} ! {network, Action, Order}
 			 end, [node()|nodes()]),
@@ -227,7 +225,7 @@ watchdog() ->
 				false ->
 					watchdog_loop(WatcherList);
 				Watcher ->
-					WatcherPID = element(1, Watcher), % can do this and send message in one line instead
+					WatcherPID = element(1, Watcher),
 					WatcherPID ! completed,
 					watchdog_loop(WatcherList--[Watcher])
 			end

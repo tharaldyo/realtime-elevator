@@ -11,12 +11,12 @@ start() ->
 	spawn(fun broadcast/0).
 
 node_init() ->
-	os:cmd("epmd -daemon"), % start epmd as daemon in case it's not running
-	timer:sleep(100), % give epmd some time to start
+	os:cmd("epmd -daemon"),
+	timer:sleep(100),
 	{_ok, [{IPtuple, _Broadcast, _Self} | _Disregard]} = inet:getif(),
-	NodeName = "elevator@"++integer_to_list(element(1,IPtuple))++"."++integer_to_list(element(2,IPtuple))++"."++integer_to_list(element(3,IPtuple))++"."++integer_to_list(element(4,IPtuple)), %how do I program
+	NodeName = "elevator@"++integer_to_list(element(1,IPtuple))++"."++integer_to_list(element(2,IPtuple))++"."++integer_to_list(element(3,IPtuple))++"."++integer_to_list(element(4,IPtuple)),
 	register(nameman, spawn(fun() -> name_manager(NodeName) end)),
-	net_kernel:start([list_to_atom(NodeName), longnames]), % give node a longname
+	net_kernel:start([list_to_atom(NodeName), longnames]),
 	erlang:set_cookie(node(), 'what-is-network-security?').
 
 listen() ->
@@ -30,7 +30,7 @@ listen(ReceiveSocket) ->
 		true ->
 			listen(ReceiveSocket);
 		false ->
-			net_adm:ping(Node), % ping node to create a connection
+			net_adm:ping(Node),
 			listen(ReceiveSocket)
 		end.
 

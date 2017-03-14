@@ -18,7 +18,7 @@ distributor() ->
             {orders, []} ->
               elevatorman ! {order, []};
 
-            {orders, GlobalOrderList} -> % get first order in queue (FIFO)
+            {orders, GlobalOrderList} ->
               [GlobalOrder|_Disregard] = GlobalOrderList,
               {Executor, Others} = get_best_elevator(GlobalOrder),
 
@@ -62,8 +62,7 @@ get_best_elevator(Order) ->
   {Executor, Elevators--[Executor]}.
 
 get_all_elevators(Order) ->
-  % returns a list of all the elevators and their state: [elevator1, elevator2, ..]
-  ListCreator = spawn(fun() -> elevator_list([]) end), % TODO: turn this into a map?
+  ListCreator = spawn(fun() -> elevator_list([]) end),
   lists:foreach(fun(Node) ->
     {stateman, Node} ! {get_state, self()},
     receive {elevator_state, Elevator} ->
@@ -72,7 +71,7 @@ get_all_elevators(Order) ->
           ListCreator ! {add_elevator, Elevator};
         busy ->
           if
-            Order#order.direction == element(4, Elevator) -> % check if order direction equals elevator direction
+            Order#order.direction == element(4, Elevator) ->
               CurrentFloor = element(3, Elevator),
               TargetFloor = (element(5, Elevator))#order.floor,
               if
