@@ -70,7 +70,7 @@ order_queue(Orders, FileName) ->
 					dets:open_file(FileName, [{type, bag}]),
 					dets:insert(FileName, NewOrder),
 					dets:close(FileName),
-          driverman ! {set_hall_lamp, element(2, NewOrder), element(3, NewOrder), on),
+          driverman ! {set_hall_lamp, element(2, NewOrder), element(3, NewOrder), on},
 					order_queue(Orders ++ [NewOrder], FileName);
 				true ->
 					order_queue(Orders, FileName)

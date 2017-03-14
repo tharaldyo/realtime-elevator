@@ -20,10 +20,7 @@ state_idle() ->
       state_driving();
 
     floor_reached ->
-      state_doors_open();
-
-    {state, driving} ->
-      state_driving()
+      state_doors_open()
 
     after 1500 ->
       state_idle()
@@ -34,10 +31,9 @@ state_driving() ->
     floor_reached ->
       driverman ! {set_motor, stop},
       state_doors_open();
+
     floor_passed ->
-      state_driving();
-    {state, idle} ->
-      state_idle()
+      state_driving()
 
     after 10000 ->
       state_lost()
@@ -56,12 +52,10 @@ state_lost() ->
     floor_reached ->
       driverman ! {set_motor, stop},
       state_doors_open();
+
     floor_passed ->
       driverman ! {set_motor, stop},
-      state_idle();
-    {state, idle} ->
-      state_idle();
-    {state, driving} ->
-      state_driving()
+      state_idle()
+
   end,
   state_lost().

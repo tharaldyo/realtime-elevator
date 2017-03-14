@@ -115,7 +115,7 @@ elevator_manager_loop() ->
 
 					turn_all_lights_off(NewFloor),
 					lists:foreach(fun(Order) -> order_manager:remove_order(localorderman, Order) end, LocalOrdersOnFloor),
-					lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersOnFloor),
+					lists:foreach(fun(Order) -> order_manager:remove_order(orderman, Order) end, GlobalOrdersOnFloor);
 
 				_OtherFloor ->
 					fsm ! floor_passed,
@@ -140,7 +140,7 @@ elevator_manager_loop() ->
 
 							timer:sleep(?DOOR_OPEN_TIME),
 							driverman ! close_door,
-							driverman ! {set_motor, Direction},
+							driverman ! {set_motor, Direction}
 						end
 			end;
 
@@ -213,7 +213,7 @@ watchdog() ->
 	receive
 		{elevator, Action, Order} -> % Action is either add_order or remove_order
 			lists:foreach(fun(Node) ->
-				 {watchdog, Node} ! {network, Action, Order},
+				 {watchdog, Node} ! {network, Action, Order}
 			 end, [node()|nodes()]),
 			watchdog_loop(WatcherList);
 
