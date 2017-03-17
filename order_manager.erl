@@ -85,6 +85,7 @@ order_queue(Orders, FileName) ->
 			dets:open_file(FileName, [{type, bag}]),
 			dets:delete_object(FileName, Order),
 			dets:close(FileName),
+      io:format("ORDER MANAGER: ACTUALLY removing order.~n"),
 			order_queue(Orders--[Order], FileName);
 
 		{get_orders, PID} ->

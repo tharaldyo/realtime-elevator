@@ -26,13 +26,31 @@ state_idle() ->
     floor_reached ->
       state_doors_open();
 
+    distributing ->
+      state_distribution();
+
     {state, driving} ->
       state_driving()
 
     after 1500 ->
       io:format("STATE MACHINE: state_idle just timed out, calling again =) ~n"),
       state_idle()
-  end.
+    end.
+
+state_distribution() ->
+  io:format("STATE MACHINE: request for order sent, waiting"),
+
+  receive
+    {drive, _Direction} ->
+      io:format("STATE MACHINE: I received a command to start driving, I will start driving now ~n"),
+      state_driving();
+    floor_reached ->
+      state_doors_open()
+
+    after 7000 ->
+      io:format("STATE MACHINE: state distribution timed out, something might be wrong"),
+      state_idle()
+    end.
 
 state_driving() ->
   io:format("STATE MACHINE: driving ~n"),
@@ -56,6 +74,7 @@ state_doors_open() ->
   timer:sleep(?DOOR_OPEN_TIME),
   io:format("STATE MACHINE: closing doors~n"),
   driverman ! close_door,
+  flusher(floor_reached),
   state_idle().
   %io:format("hello from doors_open ~n").
 
@@ -94,3 +113,9 @@ state_lost() ->
   %   driverman ! {set_motor, Direction}
   end,
   state_lost().
+
+flusher(ToFlush) ->
+	receive
+		ToFlush -> flusher(ToFlush)
+	after 0 -> ok
+	end.

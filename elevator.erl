@@ -17,7 +17,7 @@ start() ->
 
 driver_manager() ->
 	elev_driver:start(driverman, elevator), % 'elevator' or 'simulator'
-	timer:sleep(1000), %debug: try to wait for elevatorman
+	timer:sleep(5000), %debug: try to wait for elevatorman
 	elevatorman ! {driverman, initialized},
 	driver_manager_loop().
 
@@ -123,6 +123,14 @@ elevator_manager_loop() ->
 			case NewFloor of
 				TargetFloor ->
 					%fsm ! {state, driving},
+					case CurrentOrder#order.direction of
+						command ->
+							order_manager:remove_order(localorderman, CurrentOrder);
+							%timer:sleep(500);
+						_ ->
+							ok
+					end,
+
 					fsm ! floor_reached,
 					%driverman ! {set_motor, stop}, %redundant?
 					io:format("~s~n", [color:red("TARGET FLOOR REACHED!")]),
@@ -191,6 +199,8 @@ elevator_manager_loop() ->
 					elevator_manager_loop();
 
 				{order, Order} ->
+					fsm ! distributing,
+					flusher({order, Order}),
 					stateman ! {update_state, state, busy},
 					stateman ! {update_state, order, Order},
 					io:format("ELEVATOR: received an order: ~p~n", [Order]),
@@ -225,8 +235,9 @@ elevator_manager_loop() ->
 							driverman ! {set_motor, down},
 							%fsm ! {state, idle},
 							fsm ! {drive, down}
-					end
+					end,
 					%orderman ! {remove_order, MyOrder} % do this somewhere else
+					flusher({order, Order})
 			after ?RECEIVE_BLOCK_TIME -> io:format("~s: elevatorman was waiting for order from distributor~n", [color:red("TIMEOUT")]) end
 
 		end,
